@@ -515,8 +515,6 @@ pytest tests/ -v --coverage
 
 ### 💬 Topluluk ve Destek
 
-[![Discord](https://img.shields.io/badge/💬-Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/accura-finance)
-[![Telegram](https://img.shields.io/badge/📱-Telegram-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/accura_finance)
 [![Discussions](https://img.shields.io/badge/💭-GitHub_Discussions-purple?style=for-the-badge&logo=github&logoColor=white)](https://github.com/ThecoderPinar/accura-finance/discussions)
 
 ### 🆘 Yardım ve Dokümantasyon
