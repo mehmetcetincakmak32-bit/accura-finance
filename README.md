@@ -3,7 +3,8 @@
 # 🏢 Accura Finance
 ### 💼 Profesyonel Muhasebe Yazılımı
 
-<img src="https://raw.githubusercontent.com/ThecoderPinar/accura-finance/main/docs/images/logo.png" alt="Accura Finance Logo" width="200"/>
+<img width="1300" height="1024" alt="logo" src="https://github.com/user-attachments/assets/137c0448-143e-4155-b4e8-4f55235a70a1" />
+
 
 [![Python Version](https://img.shields.io/badge/Python-3.8%2B-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![CustomTkinter](https://img.shields.io/badge/GUI-CustomTkinter-00D4AA.svg?style=for-the-badge&logo=tkinter)](https://github.com/TomSchimansky/CustomTkinter)
@@ -156,7 +157,10 @@ python setup_database.py
 ### 3. 🚀 Çalıştırma
 
 ```bash
-run.bat
+/.run.bat # veya
+```
+```bash
+python main.py 
 ```
 
 <div align="center">
@@ -511,8 +515,6 @@ pytest tests/ -v --coverage
 
 ### 💬 Topluluk ve Destek
 
-[![Discord](https://img.shields.io/badge/💬-Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/accura-finance)
-[![Telegram](https://img.shields.io/badge/📱-Telegram-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/accura_finance)
 [![Discussions](https://img.shields.io/badge/💭-GitHub_Discussions-purple?style=for-the-badge&logo=github&logoColor=white)](https://github.com/ThecoderPinar/accura-finance/discussions)
 
 ### 🆘 Yardım ve Dokümantasyon
