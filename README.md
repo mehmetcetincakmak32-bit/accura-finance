@@ -156,7 +156,10 @@ python setup_database.py
 ### 3. 🚀 Çalıştırma
 
 ```bash
-run.bat
+/.run.bat # veya
+```
+```bash
+python main.py 
 ```
 
 <div align="center">
