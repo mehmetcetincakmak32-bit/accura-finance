@@ -29,6 +29,15 @@ class BankProtocol:
         Returns:
             dict: auth_code, reference_no, commission, net_amount, status
         """
+        if not card_no or len(card_no) < 6:
+            return {'status': 'error', 'message': 'Gecersiz kart numarasi'}
+        try:
+            amount = float(amount)
+        except (TypeError, ValueError):
+            return {'status': 'error', 'message': 'Gecersiz tutar'}
+        if amount <= 0:
+            return {'status': 'error', 'message': 'Tutar pozitif olmalidir'}
+
         commission = round(amount * self.commission_rate / 100, 2)
         net_amount = round(amount - commission, 2)
         auth_code = self.generate_auth_code()
@@ -43,7 +52,7 @@ class BankProtocol:
             'amount': amount,
             'installment': installment,
             'card_bin': card_no[:6],
-            'card_last4': card_no[-4:],
+            'card_last4': card_no[-4:] if len(card_no) >= 4 else card_no,
             'bank': self.bank_name,
             'status': 'success',
             'message': 'Islem basarili'
@@ -185,4 +194,6 @@ def get_protocol(bank_name, merchant_id='', terminal_id=''):
     key = bank_name.lower().replace(' ', '')
     if key in bank_map:
         return bank_map[key](merchant_id, terminal_id)
+    if key == 'yapikredi':
+        return YKBProtocol(merchant_id, terminal_id)
     return BankProtocol(merchant_id, terminal_id)

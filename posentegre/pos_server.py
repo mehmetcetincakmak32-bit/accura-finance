@@ -29,6 +29,7 @@ class POSServer:
         self._running = False
         self._clients = {}
         self._client_lock = threading.Lock()
+        self._device_to_client = {}
 
     def _setup_logger(self):
         """Sunucu logger'ini yapilandir"""
@@ -293,15 +294,18 @@ class POSServer:
         })
 
         with self._client_lock:
-            client_sock = self._clients.get(device_id)
+            client_sock = self._device_to_client.get(device_id) or self._clients.get(device_id)
 
         if not client_sock:
             return {'success': False, 'message': 'Cihaz bagli degil'}
 
         try:
             client_sock.send(message.encode('utf-8'))
+            client_sock.settimeout(10.0)
             response = client_sock.recv(self.config.buffer_size)
             return json.loads(response.decode('utf-8'))
+        except socket.timeout:
+            return {'success': False, 'message': 'Cihaz yanit vermedi'}
         except Exception as e:
             return {'success': False, 'message': f'Komut gonderilemedi: {e}'}
 
@@ -315,7 +319,7 @@ class POSServer:
             dict: Cihaz durumu
         """
         with self._client_lock:
-            is_connected = device_id in self._clients
+            is_connected = device_id in self._clients or device_id in self._device_to_client
         return {
             'success': True,
             'device_id': device_id,

@@ -1,6 +1,6 @@
 import customtkinter as ctk
+import tkinter as tk
 from tkinter import messagebox, ttk
-import sys, os
 from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

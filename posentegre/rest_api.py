@@ -8,6 +8,7 @@ import json
 import socket
 import threading
 import logging
+import hmac
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 
@@ -20,6 +21,7 @@ class POSRestAPI:
         self.config = config
         self._server_socket = None
         self._running = False
+        self._api_token = os.environ.get("POS_API_TOKEN", "")
         self.logger = self._setup_logger()
 
     def _setup_logger(self):
@@ -114,6 +116,11 @@ class POSRestAPI:
 
             self.logger.debug(f'{method} {route} - {addr}')
 
+            if not self._check_auth(data):
+                err_resp = self._json_response({'success': False, 'message': 'Yetkisiz erisim'}, 401)
+                client.sendall(err_resp.encode('utf-8'))
+                return
+
             response = self._route(method, route, query, body)
             client.sendall(response.encode('utf-8'))
 
@@ -160,19 +167,35 @@ class POSRestAPI:
                 404
             )
 
+    def _check_auth(self, request_data):
+        if not self._api_token:
+            return True
+        auth_header = None
+        for line in request_data.split('\r\n'):
+            if line.lower().startswith('authorization:'):
+                auth_header = line.split(':', 1)[1].strip()
+                break
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header[7:]
+            return hmac.compare_digest(token, self._api_token)
+        return False
+
     def _json_response(self, data, status=200):
         """HTTP JSON yaniti olustur"""
         body = json.dumps(data, ensure_ascii=False, indent=2)
-        status_text = {200: 'OK', 400: 'Bad Request', 404: 'Not Found', 500: 'Internal Server Error'}
+        status_text = {200: 'OK', 400: 'Bad Request', 401: 'Unauthorized', 404: 'Not Found', 500: 'Internal Server Error'}
         return (
             f"HTTP/1.1 {status} {status_text.get(status, 'Unknown')}\r\n"
             f"Content-Type: application/json; charset=utf-8\r\n"
             f"Content-Length: {len(body.encode('utf-8'))}\r\n"
-            f"Access-Control-Allow-Origin: *\r\n"
+            f"Access-Control-Allow-Origin: {self._get_allowed_origin()}\r\n"
             f"Connection: close\r\n"
             f"\r\n"
             f"{body}"
         )
+
+    def _get_allowed_origin(self):
+        return os.environ.get("POS_API_ALLOWED_ORIGIN", "http://localhost:3000")
 
     def handle_payment(self, params):
         """POST /api/payment - Odeme islemi

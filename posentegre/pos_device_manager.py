@@ -35,18 +35,19 @@ class POSDeviceManager:
 
     def _load_devices(self):
         """Kayitli cihazlari yukle"""
-        try:
-            with open(self.storage_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                with self._lock:
+        with self._lock:
+            try:
+                with open(self.storage_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
                     self._devices = data
-        except (FileNotFoundError, json.JSONDecodeError):
-            self._devices = {}
+            except (FileNotFoundError, json.JSONDecodeError):
+                self._devices = {}
 
     def _save_devices(self):
         """Cihaz kayitlarini dosyaya kaydet"""
-        with open(self.storage_path, 'w', encoding='utf-8') as f:
-            json.dump(self._devices, f, ensure_ascii=False, indent=2)
+        with self._lock:
+            with open(self.storage_path, 'w', encoding='utf-8') as f:
+                json.dump(self._devices, f, ensure_ascii=False, indent=2)
 
     def register_device(self, device_id, device_type, bank, ip, port):
         """Yeni POS cihazi kaydet

@@ -20,7 +20,7 @@ class InvoicesFrame(ctk.CTkFrame):
         self.main_app = main_app
         self.db_manager = main_app.db_manager
         self.invoices = []
-        self.filtered_invoices = []
+        self.filtered_invoices = None
         self.ai_agent = None
         self.github = None
 
@@ -79,7 +79,7 @@ class InvoicesFrame(ctk.CTkFrame):
             btn.grid(row=0, column=i, padx=5, pady=8)
 
         search_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
-        search_frame.grid(row=0, column=3, sticky="e", padx=10)
+        search_frame.grid(row=0, column=4, sticky="e", padx=10)
 
         self.search_entry = ctk.CTkEntry(search_frame, width=200, height=32,
             placeholder_text="🔍 Fatura ara...")
@@ -179,7 +179,7 @@ class InvoicesFrame(ctk.CTkFrame):
         for item in self.tree.get_children():
             self.tree.delete(item)
 
-        data = self.filtered_invoices if self.filtered_invoices else self.invoices
+        data = self.filtered_invoices if self.filtered_invoices is not None else self.invoices
         for inv in data:
             values = (inv["id"], inv["no"], inv["type"], inv["date"],
                      inv["customer"], inv["total"], inv["vat"], inv["status"], inv["source"])
@@ -190,7 +190,7 @@ class InvoicesFrame(ctk.CTkFrame):
     def filter_invoices(self, event=None):
         search = self.search_entry.get().lower().strip()
         if not search:
-            self.filtered_invoices = []
+            self.filtered_invoices = None
             self.refresh_table()
             return
 
@@ -238,7 +238,9 @@ class InvoicesFrame(ctk.CTkFrame):
             inv_type = fields["Tür (Alış/Satış)"].get()
             inv_date = fields["Tarih (GG.AA.YYYY)"].get()
             customer = fields["Cari Hesap"].get()
-            total = float(fields["Toplam Tutar"].get().replace(".", "").replace(",", "."))
+            raw = fields["Toplam Tutar"].get().strip().replace("₺", "").replace("TL", "").replace(" ", "")
+            raw = raw.replace(".", "").replace(",", ".") if raw.count(",") == 1 and raw.count(".") == 0 else raw.replace(",", "")
+            total = float(raw)
 
             if self.db_manager:
                 query = """
@@ -267,7 +269,7 @@ class InvoicesFrame(ctk.CTkFrame):
 
     def import_from_github(self):
         def task():
-            self.status_label.configure(text="📥 GitHub'dan faturalar alınıyor...")
+            self.after(0, lambda: self.status_label.configure(text="📥 GitHub'dan faturalar alınıyor..."))
 
             if not self.github:
                 self.after(0, lambda: messagebox.showerror("Hata", "GitHub entegrasyonu yüklenemedi!"))
@@ -276,7 +278,7 @@ class InvoicesFrame(ctk.CTkFrame):
             invoices = self.github.sync_invoices_from_github()
             if "error" in invoices:
                 self.after(0, lambda: messagebox.showerror("Hata", f"GitHub hatası: {invoices['error']}"))
-                self.status_label.configure(text="GitHub bağlantı hatası")
+                self.after(0, lambda: self.status_label.configure(text="GitHub bağlantı hatası"))
                 return
 
             imported = 0

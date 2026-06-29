@@ -710,7 +710,7 @@ class AccuraFinanceApp:
             search_svc = self.services.get('search')
             if search_svc:
                 results = search_svc.global_search(term)
-                count = sum(len(v) for v in results.values())
+                count = results.get('total', 0) if isinstance(results, dict) and 'total' in results else sum(len(v) for v in results.values()) if isinstance(results, dict) else 0
                 self.show_info(f"Arama sonucu: {count} kayit bulundu.\n\nEn hizli erisim icin ilgili modulu acin.")
             else:
                 # Servis yoksa modul adi eslesmesi dene

@@ -202,11 +202,13 @@ class SQLiteManager:
 
             # Admin kullanıcısını ekle
             import hashlib
+            import secrets
             cursor.execute("SELECT COUNT(*) as cnt FROM Users WHERE Username='admin'")
             if cursor.fetchone()[0] == 0:
-                pw_hash = hashlib.sha256("admin123".encode()).hexdigest()
+                salt = secrets.token_hex(16)
+                pw_hash = hashlib.pbkdf2_hmac('sha256', "admin123".encode(), salt.encode(), 100000).hex()
                 cursor.execute("INSERT INTO Users (Username, PasswordHash, FullName, Role) VALUES (?, ?, ?, ?)",
-                             ("admin", pw_hash, "Admin Kullanıcı", "Admin"))
+                             ("admin", f"{salt}${pw_hash}", "Admin Kullanıcı", "Admin"))
 
             # Varsayılan kasa
             cursor.execute("SELECT COUNT(*) as cnt FROM CashRegisters WHERE CashRegisterCode='KASA001'")

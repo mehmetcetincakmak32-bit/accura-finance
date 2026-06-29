@@ -9,6 +9,7 @@ import json
 import os
 import re
 import base64
+import threading
 from datetime import datetime, date
 import traceback
 
@@ -213,6 +214,7 @@ class GitHubIntegration:
                     self._save_to_database(invoice_record)
             except Exception as db_err:
                 invoice_record["db_error"] = str(db_err)
+                return {"status": "error", "message": "Veritabanina kayit basarisiz", "invoice": invoice_record}
 
             return {"status": "success", "invoice": invoice_record}
 
@@ -257,9 +259,15 @@ class GitHubIntegration:
                 self.logger.error(f"Veritabanı kayıt hatası: {e}")
             raise
 
-github_integration = GitHubIntegration()
+_github_integration_instance = None
+_github_lock = threading.Lock()
 
 def get_github_integration(db_manager=None):
+    global _github_integration_instance
+    if _github_integration_instance is None:
+        with _github_lock:
+            if _github_integration_instance is None:
+                _github_integration_instance = GitHubIntegration()
     if db_manager is not None:
-        github_integration.db_manager = db_manager
-    return github_integration
+        _github_integration_instance.db_manager = db_manager
+    return _github_integration_instance

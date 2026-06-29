@@ -106,26 +106,27 @@ class TransactionLogger:
         """
         transactions = self._load_transactions()
 
+        filtered = list(transactions)
         if date_range:
             start_date, end_date = date_range
-            transactions = [
-                t for t in transactions
-                if start_date <= t['date'][:10] <= end_date
+            filtered = [
+                t for t in filtered
+                if start_date <= t['date'][:10] < end_date
             ]
 
         if bank:
-            transactions = [
-                t for t in transactions
+            filtered = [
+                t for t in filtered
                 if t['bank'].lower() == bank.lower()
             ]
 
         if status:
-            transactions = [
-                t for t in transactions
+            filtered = [
+                t for t in filtered
                 if t['status'].lower() == status.lower()
             ]
 
-        return sorted(transactions, key=lambda x: x['date'], reverse=True)
+        return sorted(filtered, key=lambda x: x['date'], reverse=True)
 
     def get_daily_summary(self, date=None):
         """Gunluk islem ozeti
@@ -141,12 +142,13 @@ class TransactionLogger:
 
         transactions = self.get_transactions(date_range=(date, date))
 
+        successful = [t for t in transactions if t['status'] == 'success' and t['type'] == 'payment']
         summary = {
             'date': date,
             'total_transactions': len(transactions),
-            'total_amount': sum(t['amount'] for t in transactions),
-            'total_commission': sum(t['commission'] for t in transactions),
-            'total_net': sum(t['net_amount'] for t in transactions),
+            'total_amount': sum(t['amount'] for t in successful),
+            'total_commission': sum(t['commission'] for t in successful),
+            'total_net': sum(t['net_amount'] for t in successful),
             'success_count': sum(1 for t in transactions if t['status'] == 'success'),
             'failed_count': sum(1 for t in transactions if t['status'] == 'failed'),
             'refunded_count': sum(1 for t in transactions if t['status'] == 'refunded'),

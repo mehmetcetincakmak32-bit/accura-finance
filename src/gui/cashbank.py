@@ -171,8 +171,8 @@ class CashBankFrame(ctk.CTkFrame):
         for row in sample:
             self.cash_tree.insert("", "end", values=row)
 
-        total = sum((i+1)*10000 for i in range(10))
-        self.cash_card.configure(text=f"{total:,.0f} ₺")
+        net = sum((i+1)*10000 if i%2==0 else -(i+1)*10000 for i in range(10))
+        self.cash_card.configure(text=f"{net:,.0f} ₺")
 
     def _load_bank_data(self):
         for item in self.bank_tree.get_children():
@@ -187,8 +187,8 @@ class CashBankFrame(ctk.CTkFrame):
         for row in sample:
             self.bank_tree.insert("", "end", values=row)
 
-        total = sum((i+1)*25000 for i in range(10))
-        self.bank_card.configure(text=f"{total:,.0f} ₺")
+        net = sum((i+1)*25000 if i%2==0 else -(i+1)*25000 for i in range(10))
+        self.bank_card.configure(text=f"{net:,.0f} ₺")
 
     def cash_transaction(self, trans_type):
         dialog = ctk.CTkToplevel(self)
@@ -215,6 +215,18 @@ class CashBankFrame(ctk.CTkFrame):
             try:
                 amount = float(fields["Tutar (₺)"].get().replace(".", "").replace(",", "."))
                 desc = fields["Açıklama"].get()
+                if self.db_manager:
+                    try:
+                        from datetime import datetime
+                        mov_no = f"KM-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                        self.db_manager.execute_query(
+                            "INSERT INTO CashMovements (MovementNumber, MovementDate, CashRegisterID, MovementType, Amount, Description) "
+                            "VALUES (?, ?, ?, ?, ?, ?)",
+                            (mov_no, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 1, trans_type, amount, desc),
+                            fetch=False
+                        )
+                    except Exception:
+                        pass
                 messagebox.showinfo("Başarılı", f"Kasa {trans_type}: {amount:,.2f} ₺\n{desc}")
                 dialog.destroy()
             except:

@@ -156,7 +156,7 @@ class PaymentGateway:
         for taksit, min_amount in self.INSTALLMENT_LIMITS.items():
             if amount >= min_amount:
                 commission_rate = self._get_installment_commission(taksit)
-                monthly = round(amount / taksit, 2)
+                monthly = round((amount + (amount * commission_rate / 100)) / taksit, 2)
                 total = round(amount + (amount * commission_rate / 100), 2)
                 installments.append({
                     'installment': taksit,
@@ -233,11 +233,16 @@ class PaymentGateway:
 
     def _generate_3d_form(self, merchant_id, order_id, amount, hash_value):
         """3D Secure odeme sayfasi icin HTML form olustur"""
+        import html
+        safe_merchant = html.escape(str(merchant_id), quote=True)
+        safe_order = html.escape(str(order_id), quote=True)
+        safe_amount = html.escape(str(amount), quote=True)
+        safe_hash = html.escape(str(hash_value), quote=True)
         return f"""<form id="threed_form" method="post" action="https://sanalpos.bankasistemi.com/3dgate">
-    <input type="hidden" name="merchant_id" value="{merchant_id}">
-    <input type="hidden" name="order_id" value="{order_id}">
-    <input type="hidden" name="amount" value="{amount}">
-    <input type="hidden" name="hash" value="{hash_value}">
+    <input type="hidden" name="merchant_id" value="{safe_merchant}">
+    <input type="hidden" name="order_id" value="{safe_order}">
+    <input type="hidden" name="amount" value="{safe_amount}">
+    <input type="hidden" name="hash" value="{safe_hash}">
     <input type="submit" value="3D Dogrulama icin tiklayin">
 </form>
 <script>document.getElementById('threed_form').submit();</script>"""

@@ -14,7 +14,7 @@ class CustomersFrame(ctk.CTkFrame):
     def __init__(self, parent, main_app):
         super().__init__(parent)
         self.main_app = main_app
-        self.db_manager = main_app.db_manager
+        self.db_manager = getattr(main_app, 'db_manager', None)
         self.customers = []
         self.create_interface()
         self.load_customers()
@@ -135,12 +135,27 @@ class CustomersFrame(ctk.CTkFrame):
             try:
                 code = f"CAR{len(self.customers)+1001}"
                 ctype_en = "Musteri" if ctype == "Müşteri" else "Tedarikci"
+                tax_office = fields.get("Vergi Dairesi", "").get() if hasattr(fields.get("Vergi Dairesi", ""), "get") else fields.get("Vergi Dairesi", "")
                 new_c = {
                     "CurrentAccountCode": code, "CurrentAccountName": fields["Unvan"].get(),
                     "CurrentAccountType": ctype_en, "TaxNumber": fields["Vergi No"].get(),
+                    "TaxOffice": tax_office,
                     "Phone": fields["Telefon"].get(), "Email": fields["Email"].get(),
                     "Address": fields["Adres"].get(), "Balance": 0, "IsActive": 1
                 }
+                if self.db_manager:
+                    try:
+                        self.db_manager.execute_query(
+                            "INSERT INTO CurrentAccounts (CurrentAccountCode, CurrentAccountName, CurrentAccountType, "
+                            "TaxNumber, TaxOffice, Phone, Email, Address, Balance, IsActive) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+                            (code, new_c["CurrentAccountName"], ctype_en, new_c["TaxNumber"],
+                             tax_office, fields["Telefon"].get(), fields["Email"].get(),
+                             fields["Adres"].get(), 0), fetch=False
+                        )
+                    except Exception as e:
+                        messagebox.showerror("Veritabani Hatasi", str(e))
+                        return
                 new_c["CurrentAccountID"] = len(self.customers) + 1
                 self.customers.append(new_c)
                 self.refresh_table()

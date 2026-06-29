@@ -1,8 +1,7 @@
 import customtkinter as ctk
 from tkinter import messagebox, ttk
-import sys, os
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from datetime import datetime
+import random
 
 PRIMARY = "#1565c0"; SUCCESS = "#2e7d32"; WARNING = "#f57f17"
 TEXT_DARK = "#1a1a2e"; TEXT_MUTED = "#6c757d"
@@ -11,7 +10,28 @@ class CRMFrame(ctk.CTkFrame):
     def __init__(self, parent, app):
         super().__init__(parent, fg_color="#f4f6f8")
         self.app = app
+        self.db_manager = getattr(app, 'db_manager', None)
+        self.activities = self._load_sample_activities()
         self.build_ui()
+
+    def _load_sample_activities(self):
+        return [
+            {"Tarih": "20.06.2026", "Tur": "Telefon", "Musteri": "ABC Ltd.", "Konu": "Fiyat teklifi gorusmesi", "Durum": "Tamamlandi", "Takip": "-", "Sorumlu": "Ahmet"},
+            {"Tarih": "22.06.2026", "Tur": "Toplanti", "Musteri": "XYZ A.S.", "Konu": "Yeni sozlesme", "Durum": "Planlandi", "Takip": "25.06.2026", "Sorumlu": "Ayse"},
+            {"Tarih": "23.06.2026", "Tur": "Email", "Musteri": "DEF Tic.", "Konu": "Urun talebi", "Durum": "Beklemede", "Takip": "28.06.2026", "Sorumlu": "Mehmet"},
+        ]
+
+    def refresh_activities(self):
+        for w in self.tab_aktiviteler.winfo_children():
+            w.destroy()
+        headers = ["Tarih", "Aktivite Turu", "Musteri", "Konu", "Durum", "Takip Tarihi", "Sorumlu"]
+        for col, txt in enumerate(headers):
+            ctk.CTkLabel(self.tab_aktiviteler, text=txt, font=ctk.CTkFont(size=11, weight="bold"), text_color=TEXT_MUTED).grid(row=0, column=col, padx=6, pady=6, sticky="w")
+        for r, act in enumerate(self.activities, 1):
+            vals = [act.get("Tarih", ""), act.get("Tur", ""), act.get("Musteri", ""), act.get("Konu", ""), act.get("Durum", ""), act.get("Takip", ""), act.get("Sorumlu", "")]
+            for c, val in enumerate(vals):
+                clr = {"Tamamlandi": SUCCESS, "Planlandi": PRIMARY, "Beklemede": WARNING}.get(val, TEXT_DARK)
+                ctk.CTkLabel(self.tab_aktiviteler, text=val, font=ctk.CTkFont(size=11), text_color=clr).grid(row=r, column=c, padx=6, pady=4, sticky="w")
 
     def build_ui(self):
         header = ctk.CTkFrame(self, fg_color="white", corner_radius=10, height=50)
@@ -31,16 +51,7 @@ class CRMFrame(ctk.CTkFrame):
         notebook.add(self.tab_aktiviteler, text="Aktiviteler")
         notebook.add(self.tab_musteriler, text="Musteri Analizi")
 
-        for col, txt in enumerate(["Tarih", "Aktivite Turu", "Musteri", "Konu", "Durum", "Takip Tarihi", "Sorumlu"]):
-            ctk.CTkLabel(self.tab_aktiviteler, text=txt, font=ctk.CTkFont(size=11, weight="bold"), text_color=TEXT_MUTED).grid(row=0, column=col, padx=6, pady=6, sticky="w")
-
-        acts = [("20.06.2026", "Telefon", "ABC Ltd.", "Fiyat teklifi gorusmesi", "Tamamlandi", "-", "Ahmet"),
-                ("22.06.2026", "Toplanti", "XYZ A.S.", "Yeni sozlesme", "Planlandi", "25.06.2026", "Ayse"),
-                ("23.06.2026", "Email", "DEF Tic.", "Urun talebi", "Beklemede", "28.06.2026", "Mehmet")]
-        for r, row in enumerate(acts, 1):
-            for c, val in enumerate(row):
-                clr = {"Tamamlandi": SUCCESS, "Planlandi": PRIMARY, "Beklemede": WARNING}.get(val, TEXT_DARK)
-                ctk.CTkLabel(self.tab_aktiviteler, text=val, font=ctk.CTkFont(size=11), text_color=clr).grid(row=r, column=c, padx=6, pady=4, sticky="w")
+        self.refresh_activities()
 
         stats_frame = ctk.CTkFrame(self.tab_musteriler, fg_color="transparent")
         stats_frame.pack(fill="x", pady=12)
@@ -54,7 +65,34 @@ class CRMFrame(ctk.CTkFrame):
             ctk.CTkLabel(card, text=str(val), font=ctk.CTkFont(size=28, weight="bold"), text_color=PRIMARY).pack(pady=(0, 12))
 
     def new_activity(self):
-        messagebox.showinfo("Yeni Aktivite", "CRM aktivitesi formu acilacak.\n\nTurler:\n- Telefon Gorusmesi\n- Toplanti\n- Email\n- Ziyaret\n- Teklif")
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Yeni Aktivite")
+        dialog.geometry("450x400")
+        dialog.transient(self)
+        dialog.grab_set()
+        frame = ctk.CTkFrame(dialog, corner_radius=10)
+        frame.pack(fill="both", expand=True, padx=20, pady=20)
+        ctk.CTkLabel(frame, text="YENI AKTIVITE", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=(0, 15))
+        fields = {}
+        for label in ["Musteri", "Konu", "Aktivite Turu", "Sorumlu"]:
+            ctk.CTkLabel(frame, text=label, font=ctk.CTkFont(size=12, weight="bold"), anchor="w").pack(fill="x", padx=10)
+            e = ctk.CTkEntry(frame, height=32, font=ctk.CTkFont(size=13))
+            e.pack(fill="x", padx=10, pady=(0, 10))
+            fields[label] = e
+        def save():
+            self.activities.insert(0, {
+                "Tarih": datetime.now().strftime("%d.%m.%Y"),
+                "Tur": fields["Aktivite Turu"].get() or "Gorusme",
+                "Musteri": fields["Musteri"].get() or "Bilinmiyor",
+                "Konu": fields["Konu"].get() or "-",
+                "Durum": "Beklemede",
+                "Takip": "-",
+                "Sorumlu": fields["Sorumlu"].get() or "Belirtilmemis"
+            })
+            self.refresh_activities()
+            messagebox.showinfo("Basarili", "Aktivite eklendi!")
+            dialog.destroy()
+        ctk.CTkButton(frame, text="Kaydet", command=save, fg_color=SUCCESS, height=36).pack(pady=10)
 
     def report(self):
         messagebox.showinfo("CRM Raporu", "Musteri aktivite raporu hazirlaniyor...")

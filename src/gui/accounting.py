@@ -123,6 +123,15 @@ class AccountingFrame(ctk.CTkFrame):
         except Exception:
             self.use_db = False
 
+    def _parse_date_to_iso(self, date_str):
+        try:
+            parts = date_str.split(".")
+            if len(parts) == 3:
+                return f"{parts[2]}-{parts[1]}-{parts[0]}"
+        except Exception:
+            pass
+        return date_str
+
     def load_accounts_from_db(self):
         try:
             result = self.db_manager.execute_query(
@@ -133,7 +142,6 @@ class AccountingFrame(ctk.CTkFrame):
             if result:
                 self.accounts = result
             else:
-                self.use_db = False
                 self.load_sample_accounts()
             self.refresh_accounts_tree()
         except Exception:
@@ -726,10 +734,11 @@ class AccountingFrame(ctk.CTkFrame):
             try:
                 voucher_num = f"M{self.next_voucher:04d}"
                 if self.use_db:
+                    date_iso = self._parse_date_to_iso(date_str) if "." in date_str else date_str
                     self.db_manager.execute_query(
                         "INSERT INTO JournalEntries (VoucherNumber, VoucherDate, Description, TotalDebit, TotalCredit, IsBalanced) "
                         "VALUES (?, ?, ?, ?, ?, ?)",
-                        (voucher_num, date_str, desc_text, total_debit, total_credit, is_balanced),
+                        (voucher_num, date_iso, desc_text, total_debit, total_credit, is_balanced),
                         fetch=False
                     )
                     result = self.db_manager.execute_query(

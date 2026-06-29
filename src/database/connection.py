@@ -57,19 +57,22 @@ class DatabaseManagerProxy:
             return False
 
     def create_database_if_not_exists(self):
-        self._init_db()
+        if not self._init_db():
+            return False
         if hasattr(self._db, 'create_database'):
             return self._db.create_database()
         if hasattr(self._db, 'create_database_if_not_exists'):
             return self._db.create_database_if_not_exists()
-        return True
+        return bool(self._db)
 
     def test_connection(self):
-        self._init_db()
+        if not self._init_db():
+            return False
         return self._db.test_connection() if self._db else False
 
     def execute_query(self, query, params=None, fetch=True):
-        self._init_db()
+        if not self._init_db():
+            raise RuntimeError("Veritabani baslatilamadi")
         return self._db.execute_query(query, params, fetch)
 
     def execute_script(self, script_path):

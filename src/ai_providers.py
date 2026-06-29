@@ -62,10 +62,7 @@ class AIProvider:
     def __init__(self, main_app=None):
         self.main_app = main_app
         self.github_token = os.environ.get("GITHUB_TOKEN", "")
-        self.gemini_api_key = os.environ.get(
-            "GEMINI_API_KEY",
-            ""
-        )
+        self.gemini_api_key = os.environ.get("GEMINI_API_KEY", "")
         self.active_model = "github:Meta-Llama-3.1-8B-Instruct"
         self.chat_history = []
         self.max_history = 50

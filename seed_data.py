@@ -121,12 +121,17 @@ def seed_database(db_manager=None):
     existing = db_manager.execute_query("SELECT Username FROM Users")
     existing_users = {r['Username'] for r in existing}
 
+    import secrets
     new_users = []
     if 'muhasebeci' not in existing_users:
-        new_users.append(("muhasebeci", hashlib.sha256("muhasebe123".encode()).hexdigest(),
+        salt = secrets.token_hex(16)
+        pw_hash = hashlib.pbkdf2_hmac('sha256', "muhasebe123".encode(), salt.encode(), 100000).hex()
+        new_users.append(("muhasebeci", f"{salt}${pw_hash}",
                           "Muhasebe Uzmani", "muhasebe@accuratekno.com.tr", "0532 111 2233", "Muhasebeci"))
     if 'kullanici' not in existing_users:
-        new_users.append(("kullanici", hashlib.sha256("kullanici123".encode()).hexdigest(),
+        salt = secrets.token_hex(16)
+        pw_hash = hashlib.pbkdf2_hmac('sha256', "kullanici123".encode(), salt.encode(), 100000).hex()
+        new_users.append(("kullanici", f"{salt}${pw_hash}",
                           "Standart Kullanici", "kullanici@accuratekno.com.tr", "0532 444 5566", "Kullanici"))
     for u in new_users:
         db_manager.execute_query(
@@ -500,8 +505,9 @@ def seed_database(db_manager=None):
         (3, 2, 30, 1, "Cari hesaba mahsuben",                           0, 20000.00),
 
         # JE4: Tedarikci odemesi - Anadolu Ticaret (CurrentAccountID=7)
-        (4, 1, 39, 7, "Anadolu Ticaret'e odeme",                       0, 33120.00),
-        (4, 2, 28, 7, "Banka havalesi",                            33120.00, 0),
+        # Borc: SATICILAR (39) - Tedarikci borcu kapanir, Alacak: BANKALAR (28) - Bankadan para cikar
+        (4, 1, 39, 7, "Anadolu Ticaret'e odeme",                    33120.00, 0),
+        (4, 2, 28, 7, "Banka havalesi",                                   0, 33120.00),
 
         # JE5: Satis faturasi 1 (A-2025-0001) - Ahmet Yilmaz (CurrentAccountID=1)
         (5, 1, 30, 1, "A-2025-0001 nolu fatura - Ahmet Yilmaz",   48300.00, 0),

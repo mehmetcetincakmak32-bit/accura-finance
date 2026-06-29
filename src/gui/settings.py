@@ -400,14 +400,17 @@ class SettingsFrame(ctk.CTkFrame):
                 return
 
             try:
-                pw_hash = hashlib.sha256(password.encode()).hexdigest()
+                import secrets
+                salt = secrets.token_hex(16)
+                pw_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
+                stored_hash = f"{salt}${pw_hash}"
                 role = fields["role"].get()
                 is_active = 1 if fields["status"].get() == "Aktif" else 0
                 if self.use_db:
                     self.db_manager.execute_query(
                         "INSERT INTO Users (Username, PasswordHash, FullName, Email, Phone, Role, IsActive) "
                         "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        (username, pw_hash, name, fields["email"].get(), fields["phone"].get(), role, is_active),
+                        (username, stored_hash, name, fields["email"].get(), fields["phone"].get(), role, is_active),
                         fetch=False
                     )
                     self.load_users_from_db()
@@ -456,12 +459,15 @@ class SettingsFrame(ctk.CTkFrame):
                 password = fields["password"].get()
                 if self.use_db:
                     if password:
-                        pw_hash = hashlib.sha256(password.encode()).hexdigest()
+                        import secrets
+                        salt = secrets.token_hex(16)
+                        pw_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
+                        stored_hash = f"{salt}${pw_hash}"
                         self.db_manager.execute_query(
                             "UPDATE Users SET Username=?, FullName=?, Email=?, Phone=?, "
                             "Role=?, IsActive=?, PasswordHash=? WHERE UserID=?",
                             (username, name, fields["email"].get(), fields["phone"].get(),
-                             role, is_active, pw_hash, uid), fetch=False
+                             role, is_active, stored_hash, uid), fetch=False
                         )
                     else:
                         self.db_manager.execute_query(

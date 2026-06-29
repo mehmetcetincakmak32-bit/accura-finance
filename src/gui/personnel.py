@@ -28,6 +28,7 @@ class PersonnelFrame(ctk.CTkFrame):
 
         self.create_interface()
         self.load_employees()
+        self.after(100, self.refresh_attendance)
 
     def create_interface(self):
         self.grid_columnconfigure(0, weight=1)
@@ -182,7 +183,7 @@ class PersonnelFrame(ctk.CTkFrame):
             row_frame = ctk.CTkFrame(self.attendance_frame, fg_color="transparent")
             row_frame.pack(fill="x", pady=1)
 
-            name = emp.get("AdSoyad", emp.get("ad_soyad", "İsimsiz"))
+            name = emp.get("FullName", emp.get("AdSoyad", emp.get("ad_soyad", "İsimsiz")))
             ctk.CTkLabel(row_frame, text=name[:20], width=150, anchor="w",
                 font=ctk.CTkFont(size=12)).grid(row=0, column=0, padx=2)
 
@@ -343,12 +344,14 @@ class PersonnelFrame(ctk.CTkFrame):
                     INSERT INTO Employees (EmployeeCode, FullName, IdentityNumber, Department, Position, Salary, HireDate, IsActive)
                     VALUES (?, ?, ?, ?, ?, ?, ?, 1)
                     """
-                    self.db_manager.execute_query(query, (
+                    result = self.db_manager.execute_query(query, (
                         new_emp["EmployeeCode"], new_emp["FullName"], new_emp["IdentityNumber"],
                         new_emp["Department"], new_emp["Position"], new_emp["Salary"], new_emp["HireDate"]
                     ), fetch=False)
+                    new_emp["EmployeeID"] = result if result else len(self.employees) + 1
+                else:
+                    new_emp["EmployeeID"] = len(self.employees) + 1
 
-                new_emp["EmployeeID"] = len(self.employees) + 1
                 self.employees.append(new_emp)
                 self.refresh_personnel_table()
                 messagebox.showinfo("Başarılı", "Personel eklendi!")

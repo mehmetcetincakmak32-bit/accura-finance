@@ -658,13 +658,16 @@ class POSFrame(ctk.CTkFrame):
         btn_frame.pack(pady=8)
 
         def confirm():
-            self.save_payment(receipt_no, total, pay_type)
+            success_saved = self.save_payment(receipt_no, total, pay_type)
             success = ctk.CTkToplevel(win)
             success.title("Basarili")
             success.geometry("400x300")
             success.transient(win)
             success.grab_set()
-            msg = f"Odeme basariyla tamamlandi!\n\n"
+            if success_saved:
+                msg = f"Odeme basariyla tamamlandi!\n\n"
+            else:
+                msg = "UYARI: Odeme kaydedilemedi!\nMusteriye odeme alindi ancak veritabanina kayit basarisiz.\nLutfen sistem yoneticinize basvurun.\n\n"
             msg += f"Fis No: {receipt_no}\n"
             msg += f"Tutar: {total:.2f} TL\n"
             msg += f"Odeme: {self.selected_payment_label_text}\n"
@@ -673,7 +676,7 @@ class POSFrame(ctk.CTkFrame):
                 auth = f"{random.randint(100000, 999999)}"
                 msg += f"Yetki Kodu: {auth}\n"
                 msg += f"Kart: ****{random.randint(1000, 9999)}\n"
-            ctk.CTkLabel(success, text="✓ ISLEM BASARILI", font=ctk.CTkFont(size=18, weight="bold"), text_color=SUCCESS).pack(pady=16)
+            ctk.CTkLabel(success, text="✓ ISLEM BASARILI" if success_saved else "⚠ KAYIT HATASI", font=ctk.CTkFont(size=18, weight="bold"), text_color=SUCCESS if success_saved else DANGER).pack(pady=16)
             ctk.CTkLabel(success, text=msg, font=ctk.CTkFont(size=12), text_color=TEXT_DARK, justify="left").pack(padx=20)
             ctk.CTkButton(success, text="Tamam", width=120, height=34, fg_color=SUCCESS,
                          command=lambda: [success.destroy(), win.destroy()]).pack(pady=12)
@@ -707,8 +710,10 @@ class POSFrame(ctk.CTkFrame):
                     })
                 payments = [{'PaymentType': pay_type, 'Amount': total}]
                 pos.create_sale(sale_data, items, payments)
+                return True
         except Exception:
-            pass
+            return False
+        return False
 
     def open_session(self):
         if self.session_open:
@@ -756,23 +761,35 @@ class POSFrame(ctk.CTkFrame):
             return
         if not messagebox.askyesno("Oturum Kapat", "Gun sonu islemi yapilacak. Devam edilsin mi?"):
             return
-        self.session_open = False
-        self.session_indicator.configure(text="KAPALI", text_color=DANGER, fg_color=DANGER)
+        session_sales = []
         try:
             if POSService and get_database_manager and self.session_id:
                 pos = POSService()
+                session_sales = pos.get_session_sales(self.session_id)
                 pos.close_session(self.session_id, 0)
         except Exception:
             pass
+        self.session_open = False
+        self.session_indicator.configure(text="KAPALI", text_color=DANGER, fg_color=DANGER)
         self.session_id = None
+        total_sales = len(session_sales)
         messagebox.showinfo("Gun Sonu",
             "POS oturumu kapatildi.\n\nGUN SONU RAPORU:\n"
             f"Kapanis: {datetime.now().strftime('%d.%m.%Y %H:%M')}\n"
-            f"Toplam Satis: {len(self.cart_items)} kalem\n"
+            f"Toplam Satis: {total_sales} kalem\n"
             "Z Raporu alindi.")
 
     def z_report(self):
-        total = self.calc_total()
+        session_sales = []
+        try:
+            if POSService and get_database_manager:
+                pos = POSService()
+                if self.session_id:
+                    session_sales = pos.get_session_sales(self.session_id)
+        except Exception:
+            pass
+        total = sum(s.get('TotalAmount', 0) for s in session_sales) if session_sales else self.calc_total()
+        count = len(session_sales) if session_sales else len(self.cart_items)
         report = (
             "Z RAPORU (GUN SONU)\n"
             f"{'='*35}\n"
@@ -787,7 +804,7 @@ class POSFrame(ctk.CTkFrame):
             f"Havale/EFT:         {total * 0.02 if total > 0 else 0:.2f} TL\n"
             f"{'='*35}\n"
             f"GENEL TOPLAM:        {total:.2f} TL\n"
-            f"Islem Sayisi:       {len(self.cart_items)}\n"
+            f"Islem Sayisi:       {count}\n"
             f"Durum: ACIK\n"
         )
         win = ctk.CTkToplevel(self)

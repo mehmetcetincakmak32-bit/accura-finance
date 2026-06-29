@@ -1,2 +1,4 @@
 Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run chr(34) & "C:\Users\acer\Desktop\accura-finance\baslat.bat" & Chr(34), 0, False
+Set FSO = CreateObject("Scripting.FileSystemObject")
+basePath = FSO.GetParentFolderName(WScript.ScriptFullName)
+WshShell.Run chr(34) & basePath & "\baslat.bat" & Chr(34), 0, False

@@ -166,18 +166,25 @@ class LoginWindow:
     
     def authenticate_user(self, username, password):
         try:
-            password_hash = hashlib.sha256(password.encode()).hexdigest()
-            
             query = """
-            SELECT UserID, Username, FullName, Email, Role 
+            SELECT UserID, Username, FullName, Email, Role, PasswordHash
             FROM Users 
-            WHERE Username = ? AND PasswordHash = ? AND IsActive = 1
+            WHERE Username = ? AND IsActive = 1
             """
             
-            result = self.db_manager.execute_query(query, (username, password_hash))
+            result = self.db_manager.execute_query(query, (username,))
             
             if result and len(result) > 0:
-                return result[0]
+                user = result[0]
+                stored_hash = user.get("PasswordHash", "")
+                if "$" in stored_hash:
+                    salt, expected = stored_hash.split("$", 1)
+                    computed = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
+                    if computed == expected:
+                        return user
+                else:
+                    if hashlib.sha256(password.encode()).hexdigest() == stored_hash:
+                        return user
             
             return None
         

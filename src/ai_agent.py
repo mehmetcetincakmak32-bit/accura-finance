@@ -41,11 +41,13 @@ class AIAgent:
                 }
             }
 
-            url = f"{self.api_url}?key={self.api_key}"
             req = urllib.request.Request(
-                url,
+                f"{self.api_url}?key={self.api_key}",
                 data=json.dumps(data).encode(),
-                headers={"Content-Type": "application/json"}
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Goog-Api-Key": self.api_key
+                }
             )
             response = urllib.request.urlopen(req, timeout=30)
             result = json.loads(response.read())
