@@ -51,11 +51,13 @@ class Accountant24Adapter:
                 },
             }
 
-            url = f"{self.api_url}?key={self.api_key}"
             req = urllib.request.Request(
-                url,
+                self.api_url,
                 data=json.dumps(data).encode(),
-                headers={"Content-Type": "application/json"},
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Goog-Api-Key": self.api_key
+                },
             )
             with urllib.request.urlopen(req, timeout=60) as resp:
                 result = json.loads(resp.read())
