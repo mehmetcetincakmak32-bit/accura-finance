@@ -175,7 +175,7 @@ class POSRestAPI:
             if line.lower().startswith('authorization:'):
                 auth_header = line.split(':', 1)[1].strip()
                 break
-        if auth_header and auth_header.startswith('Bearer '):
+        if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header[7:]
             return hmac.compare_digest(token, self._api_token)
         return False
