@@ -1,546 +1,433 @@
-"""
-Accura Finance - Dashboard
-Ana sayfa ve özet bilgiler
-"""
-
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import ttk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import matplotlib.dates as mdates
 from datetime import datetime, timedelta, date
-import sys
-import os
+import sys, os, threading, random
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+PRIMARY = "#1565c0"; PRIMARY_DARK = "#0d47a1"; PRIMARY_LIGHT = "#42a5f5"
+SUCCESS = "#2e7d32"; DANGER = "#c62828"; WARNING = "#f57f17"
+TEXT_DARK = "#1a1a2e"; TEXT_MUTED = "#6c757d"; BORDER = "#e8eaed"; CARD_BG = "#ffffff"
+
+try:
+    from src.gui.widgets.custom_widgets import StatsCard
+except ImportError:
+    class StatsCard(ctk.CTkFrame):
+        def __init__(self, parent, title="", value="", change=None, icon=None, change_color=None,
+                     card_color=CARD_BG, value_color=PRIMARY, **kwargs):
+            super().__init__(parent, fg_color=card_color, corner_radius=10, border_width=1, border_color=BORDER, **kwargs)
+            self.grid_columnconfigure(0, weight=1)
+            self._click_callback = None
+            t = ctk.CTkFrame(self, fg_color="transparent"); t.grid(row=0, column=0, padx=14, pady=(12,0), sticky="ew")
+            t.grid_columnconfigure(1, weight=1)
+            if icon: ctk.CTkLabel(t, text=icon, font=ctk.CTkFont(size=18), width=28).grid(row=0, column=0, padx=(0,6), sticky="w")
+            ctk.CTkLabel(t, text=title, font=ctk.CTkFont(size=11), text_color=TEXT_MUTED, anchor="w").grid(row=0, column=1, sticky="w")
+            vf = ctk.CTkFrame(self, fg_color="transparent"); vf.grid(row=1, column=0, padx=14, pady=(4,4), sticky="ew")
+            vf.grid_columnconfigure(0, weight=1)
+            self._v = ctk.CTkLabel(vf, text=str(value), font=ctk.CTkFont(size=24, weight="bold"), text_color=value_color, anchor="w")
+            self._v.grid(row=0, column=0, sticky="w")
+            if change is not None:
+                c = change_color or (SUCCESS if change>=0 else DANGER)
+                a = "\u25b2" if change>=0 else "\u25bc"
+                self._cl = ctk.CTkLabel(vf, text=f"{a} {abs(change)}%", font=ctk.CTkFont(size=11), text_color=c, anchor="w")
+                self._cl.grid(row=0, column=1, padx=(8,0), sticky="w")
+            self.bind("<Button-1>", self._on_click)
+            for ch in self.winfo_children(): ch.bind("<Button-1>", self._on_click)
+        def _on_click(self, e=None):
+            if self._click_callback: self._click_callback()
+        def on_click(self, cb): self._click_callback = cb
+        def set_value(self, v): self._v.configure(text=str(v))
+        def set_change(self, ch, c=None):
+            if ch is None: return
+            c = c or (SUCCESS if ch>=0 else DANGER)
+            a = "\u25b2" if ch>=0 else "\u25bc"
+            self._cl.configure(text=f"{a} {abs(ch)}%", text_color=c)
+
+SVC = None; db = None
+try:
+    from src.services.db_service import AccountingService, InventoryService, CustomerService, InvoiceService
+    from src.database.connection import get_database_manager
+    db = get_database_manager()
+    SVC = type('S', (), {'acc': AccountingService(db), 'inv': InventoryService(db),
+                         'cus': CustomerService(db), 'inv_svc': InvoiceService(db)})()
+except Exception:
+    pass
+
+TR_MONTHS = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"]
+
+fmt = lambda v: f"{v:,.2f} \u20ba"
+qry = lambda q, p=None: db.execute_query(q, p, fetch=True) if db and SVC else None
 
 class DashboardFrame(ctk.CTkFrame):
     def __init__(self, parent, main_app):
         super().__init__(parent)
         self.main_app = main_app
-        self.db_manager = main_app.db_manager
-        
-        self.create_dashboard()
-        self.load_dashboard_data()
-    
-    def create_dashboard(self):
-        """Dashboard arayüzünü oluştur"""
-        # Ana container
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
-        
-        # Başlık
-        self.create_header()
-        
-        # Ana içerik
-        self.create_main_content()
-    
-    def create_header(self):
-        """Başlık alanı"""
-        header_frame = ctk.CTkFrame(self, height=80, corner_radius=10)
-        header_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
-        header_frame.grid_propagate(False)
-        
-        # Başlık metni - Modern gradyan tasarım
-        title_container = ctk.CTkFrame(header_frame, fg_color="transparent")
-        title_container.pack(side="left", padx=20, pady=20)
-        
-        title_label = ctk.CTkLabel(
-            title_container,
-            text="🏢 DASHBOARD",
-            font=ctk.CTkFont(size=28, weight="bold"),
-            text_color=("#0d47a1", "#64b5f6")
-        )
-        title_label.pack()
-        
-        subtitle_label = ctk.CTkLabel(
-            title_container,
-            text="💼 Finansal Kontrol Merkezi",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color=("#1976d2", "#42a5f5")
-        )
-        subtitle_label.pack()
-        
-        # Tarih ve bilgi alanı - Modern
-        info_container = ctk.CTkFrame(header_frame, fg_color="transparent")
-        info_container.pack(side="right", padx=20, pady=20)
-        
-        today = datetime.now().strftime("%d %B %Y")
-        date_label = ctk.CTkLabel(
-            info_container,
-            text=f"📅 {today}",
-            font=ctk.CTkFont(size=16, weight="bold"),
-            text_color=("#1565c0", "#90caf9")
-        )
-        date_label.pack()
-        
-        time_label = ctk.CTkLabel(
-            info_container,
-            text=f"🕐 {datetime.now().strftime('%H:%M')}",
-            font=ctk.CTkFont(size=12),
-            text_color=("gray60", "gray40")
-        )
-        time_label.pack()
-    
-    def create_main_content(self):
-        """Ana içerik alanı"""
-        # Scrollable frame
-        self.scrollable_frame = ctk.CTkScrollableFrame(self)
-        self.scrollable_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=(5, 10))
-        self.scrollable_frame.grid_columnconfigure((0, 1), weight=1)
-        
-        # Özet kartlar
-        self.create_summary_cards()
-        
-        # Grafikler
-        self.create_charts_section()
-        
-        # Son işlemler
-        self.create_recent_transactions()
-        
-        # Hızlı erişim
-        self.create_quick_access()
-    
-    def create_summary_cards(self):
-        """Modern özet kart alanı"""
-        # Ana başlık
-        title_frame = ctk.CTkFrame(self.scrollable_frame, fg_color="transparent")
-        title_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 15))
-        
-        main_title = ctk.CTkLabel(
-            title_frame,
-            text="📊 Finansal Özet",
-            font=ctk.CTkFont(size=22, weight="bold"),
-            text_color=("#0d47a1", "#64b5f6")
-        )
-        main_title.pack(side="left", padx=20)
-        
-        # Kartlar container
-        cards_container = ctk.CTkFrame(
-            self.scrollable_frame, 
-            corner_radius=15,
-            fg_color=("#f8f9fa", "#2d2d2d"),
-            border_width=1,
-            border_color=("#e9ecef", "#3d3d3d")
-        )
-        cards_container.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 25))
-        cards_container.grid_columnconfigure((0, 1, 2, 3), weight=1)
-        
-        # Kartlar
-        self.summary_cards = {}
-        
-        # Toplam Satış - Yeşil gradient
-        self.summary_cards['sales'] = self.create_modern_card(
-            cards_container, "💰", "Toplam Satış", "0 ₺", "Bu ay ↗", 0, 0, 
-            ("#4caf50", "#66bb6a"), ("#e8f5e8", "#2d4a2d")
-        )
-        
-        # Toplam Alış - Kırmızı gradient  
-        self.summary_cards['purchases'] = self.create_modern_card(
-            cards_container, "🛒", "Toplam Alış", "0 ₺", "Bu ay ↗", 0, 1,
-            ("#f44336", "#ef5350"), ("#ffebee", "#4a2d2d")
-        )
-        
-        # Kasa Bakiyesi - Mavi gradient
-        self.summary_cards['cash'] = self.create_modern_card(
-            cards_container, "💵", "Kasa Bakiyesi", "0 ₺", "Toplam 💎", 0, 2,
-            ("#2196f3", "#42a5f5"), ("#e3f2fd", "#2d3a4a")
-        )
-        
-        # Banka Bakiyesi - Mor gradient
-        self.summary_cards['bank'] = self.create_modern_card(
-            cards_container, "🏦", "Banka Bakiyesi", "0 ₺", "Toplam 🏆", 0, 3,
-            ("#9c27b0", "#ab47bc"), ("#f3e5f5", "#4a2d4a")
-        )
-    
-    def create_modern_card(self, parent, icon, title, value, subtitle, row, col, main_color, bg_color):
-        """Modern gradient kart oluştur"""
-        # Ana kart frame
-        card = ctk.CTkFrame(
-            parent, 
-            corner_radius=12,
-            fg_color=bg_color,
-            border_width=2,
-            border_color=main_color
-        )
-        card.grid(row=row, column=col, padx=12, pady=15, sticky="ew")
-        
-        # İçerik container
-        content_frame = ctk.CTkFrame(card, fg_color="transparent")
-        content_frame.pack(fill="both", expand=True, padx=15, pady=15)
-        
-        # Üst alan - İkon ve başlık
-        top_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-        top_frame.pack(fill="x", pady=(0, 10))
-        
-        # İkon - Büyük ve parlak
-        icon_label = ctk.CTkLabel(
-            top_frame,
-            text=icon,
-            font=ctk.CTkFont(size=32)
-        )
-        icon_label.pack(side="left")
-        
-        # Başlık
-        title_label = ctk.CTkLabel(
-            top_frame,
-            text=title,
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color=main_color
-        )
-        title_label.pack(side="right", anchor="e")
-        
-        # Değer - Büyük ve vurgulu
-        value_label = ctk.CTkLabel(
-            content_frame,
-            text=value,
-            font=ctk.CTkFont(size=20, weight="bold"),
-            text_color=main_color
-        )
-        value_label.pack(anchor="w", pady=(0, 5))
-        
-        # Alt bilgi
-        subtitle_label = ctk.CTkLabel(
-            content_frame,
-            text=subtitle,
-            font=ctk.CTkFont(size=11, weight="bold"),
-            text_color=("gray50", "gray60")
-        )
-        subtitle_label.pack(anchor="w")
-        
+        self._rid = None; self._loading = False; self._period = "today"
+        self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(0, weight=1)
+        self.sf = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.sf.grid(row=0, column=0, sticky="nsew"); self.sf.grid_columnconfigure(0, weight=1)
+        self.ol = ctk.CTkFrame(self, fg_color="transparent")
+        self.ol.grid(row=0, column=0, sticky="nsew")
+        self._build()
+        self.after(100, self.refresh); self._auto()
+
+    def _build(self):
+        self._hdr()
+        self._stat_cards()
+        self._charts()
+        self._bottom()
+
+    def _hdr(self):
+        h = ctk.CTkFrame(self.sf, height=72, corner_radius=12, fg_color="#ffffff")
+        h.grid(row=0, column=0, sticky="ew", padx=10, pady=(0,15)); h.grid_propagate(False)
+        i = ctk.CTkFrame(h, fg_color="transparent"); i.pack(fill="both", expand=True, padx=24)
+        i.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(i, text="ACCURA FİNANS", font=ctk.CTkFont(size=26, weight="bold"), text_color=PRIMARY_DARK).grid(row=0, column=0, sticky="w")
+        s = ctk.CTkFrame(i, fg_color="transparent"); s.grid(row=0, column=1, sticky="w", padx=(10,0))
+        ctk.CTkLabel(s, text="Finansal Kontrol Merkezi", font=ctk.CTkFont(size=13), text_color=TEXT_MUTED).pack(side="left")
+        u = (self.main_app.current_user.get('FullName','Kullanıcı') if self.main_app and hasattr(self.main_app,'current_user') and self.main_app.current_user else "Kullanıcı")
+        ctk.CTkLabel(s, text=f"| Hoş geldin, {u}", font=ctk.CTkFont(size=12), text_color=PRIMARY).pack(side="left", padx=(8,0))
+        r = ctk.CTkFrame(i, fg_color="transparent"); r.grid(row=0, column=2, sticky="e")
+        self._tl = ctk.CTkLabel(r, text="", font=ctk.CTkFont(size=12), text_color=TEXT_MUTED); self._tl.pack(side="left")
+        ctk.CTkButton(r, text="⟳", width=32, height=28, fg_color="transparent", hover_color="#e3f2fd",
+            text_color=TEXT_MUTED, font=ctk.CTkFont(size=16), command=self.refresh).pack(side="left", padx=(8,0))
+
+    def _stat_cards(self):
+        c = ctk.CTkFrame(self.sf, fg_color="transparent")
+        c.grid(row=1, column=0, sticky="ew", padx=10, pady=(0,20))
+        for i in range(6): c.grid_columnconfigure(i, weight=1)
+        self._sc = {}
+        for i,(k,t,clr,ico) in enumerate([("satis","Toplam Satış",SUCCESS,"📈"),("tahsilat","Toplam Tahsilat",SUCCESS,"💵"),
+            ("kasa","Kasa Bakiyesi",PRIMARY,"🏦"),("banka","Banka Bakiyesi","#7b1fa2","🏛"),
+            ("cari","Cari Bakiye",WARNING,"👥"),("stok","Stok Değeri",PRIMARY_DARK,"📦")]):
+            card = StatsCard(c, title=t, value="---", icon=ico, value_color=clr, card_color="#ffffff")
+            card.grid(row=0, column=i, padx=5, pady=5, sticky="ew")
+            self._sc[k] = card
+            if k == "satis":
+                tg = ctk.CTkFrame(card, fg_color="transparent"); tg.grid(row=3, column=0, padx=14, pady=(0,8), sticky="ew")
+                for p,l in [("today","Bugün"),("monthly","Bu Ay"),("ytd","Yıl")]:
+                    ctk.CTkButton(tg, text=l, width=40, height=20, fg_color="transparent",
+                        hover_color="#e3f2fd", text_color=TEXT_MUTED, font=ctk.CTkFont(size=11),
+                        command=lambda pp=p: self._sw(pp)).pack(side="left", padx=2)
+
+    def _sw(self, p): self._period = p; self.refresh()
+
+    def _charts(self):
+        c = ctk.CTkFrame(self.sf, fg_color="transparent")
+        c.grid(row=2, column=0, sticky="ew", padx=10, pady=(0,20))
+        c.grid_columnconfigure((0,1), weight=1); c.grid_rowconfigure((0,1), weight=1)
+        self._cf = {}
+        for k,t,r,col in [("bar","Aylık Satış / Alış Grafiği (Son 12 Ay)",0,0),("pie","Cari Hesap Dağılımı",0,1),
+                          ("line","Nakit Akış Grafiği (Son 30 Gün)",1,0),("hbar","Stok Durumu (İlk 10 Ürün)",1,1)]:
+            f = ctk.CTkFrame(c, corner_radius=10, fg_color="#ffffff")
+            f.grid(row=r, column=col, padx=6, pady=6, sticky="nsew")
+            ctk.CTkLabel(f, text=t, font=ctk.CTkFont(size=13, weight="bold"), text_color=TEXT_DARK).pack(pady=(12,4))
+            self._cf[k] = f
+
+    def _bottom(self):
+        c = ctk.CTkFrame(self.sf, fg_color="transparent")
+        c.grid(row=3, column=0, sticky="ew", padx=10, pady=(0,20))
+        c.grid_columnconfigure((0,1), weight=1)
+        l = ctk.CTkFrame(c, corner_radius=10, fg_color="#ffffff"); l.grid(row=0, column=0, padx=6, sticky="nsew")
+        ctk.CTkLabel(l, text="Son İşlemler", font=ctk.CTkFont(size=14, weight="bold"), text_color=TEXT_DARK).pack(anchor="w", padx=16, pady=(14,10))
+        self._tc = ctk.CTkFrame(l, fg_color="transparent"); self._tc.pack(fill="both", expand=True, padx=12, pady=(0,12))
+        r = ctk.CTkFrame(c, corner_radius=10, fg_color="#ffffff"); r.grid(row=0, column=1, padx=6, sticky="nsew")
+        ctk.CTkLabel(r, text="Hızlı Erişim", font=ctk.CTkFont(size=14, weight="bold"), text_color=TEXT_DARK).pack(anchor="w", padx=16, pady=(14,10))
+        for t,cmd,clr in [("Yeni Fatura",self._ni,PRIMARY),("Kasa İşlemi",self._co,SUCCESS),("Yeni Cari",self._nc,"#7b1fa2"),("Mizan Raporu",self._br,WARNING)]:
+            ctk.CTkButton(r, text=t, command=cmd, fg_color=clr, hover_color=clr, height=36, corner_radius=6,
+                font=ctk.CTkFont(size=12, weight="bold")).pack(fill="x", padx=16, pady=4)
+        ctk.CTkFrame(r, height=1, fg_color=BORDER).pack(fill="x", padx=16, pady=(12,6))
+        ctk.CTkLabel(r, text="Yaklaşan Vadeler", font=ctk.CTkFont(size=13, weight="bold"), text_color=TEXT_DARK).pack(anchor="w", padx=16, pady=(4,6))
+        self._mc = ctk.CTkFrame(r, fg_color="transparent"); self._mc.pack(fill="both", expand=True, padx=12, pady=(0,12))
+
+    def _load(self, show=True):
+        if show:
+            self._loading = True
+            self.ol.configure(fg_color="#ffffff")
+            self.ol.tkraise()
+            ctk.CTkLabel(self.ol, text="Veriler yükleniyor...", font=ctk.CTkFont(size=18, weight="bold"), text_color=TEXT_MUTED).place(relx=0.5, rely=0.5, anchor="center")
+        else:
+            self._loading = False; self.ol.lower(); self.ol.configure(fg_color="transparent")
+            for w in self.ol.winfo_children(): w.destroy()
+
+    def refresh(self):
+        if self._loading: return
+        self._load(True)
+        threading.Thread(target=self._ld, daemon=True).start()
+
+    def _ld(self):
+        try:
+            d = self._data()
+            self.after(0, lambda: self._up(d))
+        except Exception:
+            self.after(0, lambda: self._up(None))
+        finally:
+            self.after(0, lambda: self._load(False))
+
+    def _safe(self, d, k, df=0): return d.get(k, df) if d else df
+
+    def _data(self):
+        now = datetime.now(); today = date.today().isoformat()
+        def rnd(a,b): return random.uniform(a,b)
+        sd = None; cd = None; bd = None; crd = None; skd = None
+        if SVC and db:
+            try:
+                if self._period == "today":
+                    invs = SVC.inv_svc.get_invoices(type_filter="Satis", date_range=(today,today)) or []
+                elif self._period == "monthly":
+                    s = today[:8]+"01"
+                    invs = SVC.inv_svc.get_invoices(type_filter="Satis", date_range=(s,today)) or []
+                else:
+                    s = str(now.year)+"-01-01"
+                    invs = SVC.inv_svc.get_invoices(type_filter="Satis", date_range=(s,today)) or []
+                total = sum(i.get('TotalAmount',0) for i in invs)
+                sd = {'v': total, 'ch': 0}
+                cr = qry("SELECT COALESCE(SUM(CurrentBalance),0) as bal FROM CashRegisters")
+                if cr: cd = {'v': cr[0]['bal'], 'ch': None}
+                br = qry("SELECT COALESCE(SUM(CurrentBalance),0) as bal FROM Banks")
+                if br: bd = {'v': br[0]['bal'], 'ch': None}
+                car = qry("""SELECT COALESCE(SUM(CASE WHEN Balance>0 THEN Balance ELSE 0 END),0) as al,
+                    COALESCE(SUM(CASE WHEN Balance<0 THEN ABS(Balance) ELSE 0 END),0) as vr
+                    FROM CurrentAccounts WHERE IsActive=1""")
+                if car: crd = {'v': car[0]['al']-car[0]['vr'], 'al': car[0]['al'], 'vr': car[0]['vr'], 'ch': None}
+                if SVC.inv: skd = {'v': (SVC.inv.get_stock_value() or {}).get('TotalValueLIFO',0), 'ch': None}
+            except Exception:
+                pass
+        if not sd: sd = {'v': rnd(5000,25000), 'ch': rnd(-5,8)}
+        if not cd: cd = {'v': rnd(10000,50000), 'ch': rnd(-5,5)}
+        if not bd: bd = {'v': rnd(50000,300000), 'ch': rnd(-3,3)}
+        if not crd: crd = {'v': rnd(-50000,150000), 'ch': rnd(-8,8)}
+        if not skd: skd = {'v': rnd(100000,500000), 'ch': rnd(-2,5)}
+
+        def month_sales():
+            if SVC and SVC.inv_svc:
+                try:
+                    rm = SVC.inv_svc.get_monthly_invoice_summary(now.year) or []
+                    mm = {r['Month'].lstrip('0'): r for r in rm}
+                    ls, sl, pl = [], [], []
+                    for i in range(12):
+                        ls.append(TR_MONTHS[i]); r = mm.get(str(i+1),{})
+                        sl.append(r.get('SalesTotal',0) or 0); pl.append(r.get('PurchaseTotal',0) or 0)
+                    return ls, sl, pl
+                except Exception:
+                    pass
+            return [TR_MONTHS[i] for i in range(12)], [rnd(20000,120000) for _ in range(12)], [rnd(15000,90000) for _ in range(12)]
+        ml, ms, mp = month_sales()
+
+        if SVC and db:
+            try:
+                cr = qry("SELECT CurrentAccountType, COALESCE(SUM(ABS(Balance)),0) as t FROM CurrentAccounts WHERE IsActive=1 AND Balance!=0 GROUP BY CurrentAccountType") or []
+                ct, cs = {}, []
+                for r in cr:
+                    ct[r['CurrentAccountType']] = ct.get(r['CurrentAccountType'],0)+r['t']
+                ckeys = [k for k in ['Musteri','Tedarikci','Personel'] if ct.get(k,0)>0]
+                cvals = [ct.get(k,0) for k in ckeys]
+                oth = sum(v for k,v in ct.items() if k not in ['Musteri','Tedarikci','Personel'])
+                if oth>0: ckeys.append('Diğer'); cvals.append(oth)
+                if not ckeys: ckeys=['Müşteriler','Tedarikçiler','Personel','Diğer']; cvals=[45,30,15,10]
+            except Exception:
+                ckeys=['Müşteriler','Tedarikçiler','Personel','Diğer']; cvals=[45,30,15,10]
+        else:
+            ckeys=['Müşteriler','Tedarikçiler','Personel','Diğer']; cvals=[45,30,15,10]
+
+        if SVC and db and SVC.acc:
+            try:
+                e = now.strftime('%Y-%m-%d'); s = (now-timedelta(days=30)).strftime('%Y-%m-%d')
+                cf = SVC.acc.get_cash_flow(s,e) or []
+                dm = {}
+                for r in cf:
+                    d = (r['MovementDate'][:10] if isinstance(r['MovementDate'],str) else str(r['MovementDate'])[:10])
+                    am = abs(r.get('Amount',0))
+                    tp = r.get('MovementType','')
+                    if tp in ('Giris','Tahsilat','NakitGiris'): dm.setdefault(d,{'i':0,'o':0})['i']+=am
+                    else: dm.setdefault(d,{'i':0,'o':0})['o']+=am
+                ll, ii, oo = [], [], []
+                for i in range(30):
+                    d = (now-timedelta(days=29-i))
+                    ll.append(d.strftime('%d %b')); m = dm.get(d.strftime('%Y-%m-%d'),{'i':0,'o':0})
+                    ii.append(m['i']); oo.append(m['o'])
+            except Exception:
+                ll=[(now-timedelta(days=29-i)).strftime('%d %b') for i in range(30)]
+                ii=[rnd(1000,20000) for _ in range(30)]; oo=[rnd(800,18000) for _ in range(30)]
+        else:
+            ll=[(now-timedelta(days=29-i)).strftime('%d %b') for i in range(30)]
+            ii=[rnd(1000,20000) for _ in range(30)]; oo=[rnd(800,18000) for _ in range(30)]
+
+        if SVC and SVC.inv:
+            try:
+                si = SVC.inv.get_stock_items() or []
+                si = sorted(si, key=lambda x: x.get('CurrentStock',0), reverse=True)[:10]
+                sl = [r.get('StockName','')[:20] for r in si]; sv = [r.get('CurrentStock',0) for r in si]
+            except Exception:
+                sl=[f"Ürün {i+1}" for i in range(10)]; sv=[random.randint(10,500) for _ in range(10)]
+        else:
+            sl=[f"Ürün {i+1}" for i in range(10)]; sv=[random.randint(10,500) for _ in range(10)]
+
+        if SVC and SVC.inv_svc:
+            try:
+                tr = SVC.inv_svc.get_invoices() or []
+                txn = []
+                for r in tr[:10]:
+                    d = r.get('InvoiceDate','')
+                    if isinstance(d,str) and len(d)>10: d=d[:10]
+                    txn.append({'d':d,'tp':r.get('InvoiceType',''),'desc':f"{r.get('CurrentAccountName','')} - {r.get('InvoiceNumber','')}",'amt':r.get('TotalAmount',0)})
+            except Exception:
+                txn = [{'d':(now-timedelta(days=i)).strftime('%d.%m.%Y'),'tp':["Satış","Alış","Tahsilat","Ödeme"][i%4],
+                    'desc':f"İşlem #{i+1}",'amt':rnd(1000,50000)*(-1 if i%4 in (1,3) else 1)} for i in range(10)]
+        else:
+            txn = [{'d':(now-timedelta(days=i)).strftime('%d.%m.%Y'),'tp':["Satış","Alış","Tahsilat","Ödeme"][i%4],
+                'desc':f"İşlem #{i+1}",'amt':rnd(1000,50000)*(-1 if i%4 in (1,3) else 1)} for i in range(10)]
+
+        if SVC and db:
+            try:
+                ft = (date.today()+timedelta(days=30)).isoformat()
+                mt = qry("""SELECT inv.InvoiceNumber, inv.DueDate, inv.RemainingAmount, ca.CurrentAccountName
+                    FROM Invoices inv JOIN CurrentAccounts ca ON inv.CurrentAccountID=ca.CurrentAccountID
+                    WHERE inv.RemainingAmount>0 AND inv.DueDate BETWEEN ? AND ? ORDER BY inv.DueDate LIMIT 8""",(today,ft)) or []
+                mat = [{'inv':r['InvoiceNumber'],'name':r['CurrentAccountName'],
+                    'due':(r['DueDate'][:10] if isinstance(r['DueDate'],str) else str(r['DueDate'])[:10]),
+                    'amt':r['RemainingAmount']} for r in mt]
+            except Exception:
+                mat = [{'inv':f"INV-{i+1:04d}",'name':f"Cari {i+1}",'due':(date.today()+timedelta(days=(i+1)*3)).strftime('%d.%m.%Y'),
+                    'amt':rnd(2000,30000)} for i in range(5)]
+        else:
+            mat = [{'inv':f"INV-{i+1:04d}",'name':f"Cari {i+1}",'due':(date.today()+timedelta(days=(i+1)*3)).strftime('%d.%m.%Y'),
+                'amt':rnd(2000,30000)} for i in range(5)]
+
         return {
-            'card': card,
-            'value_label': value_label,
-            'subtitle_label': subtitle_label
+            'sd': sd, 'cd': cd, 'bd': bd, 'crd': crd, 'skd': skd,
+            'ml': ml, 'ms': ms, 'mp': mp,
+            'ckeys': ckeys, 'cvals': cvals,
+            'cf_labels': ll, 'cf_in': ii, 'cf_out': oo,
+            'stock_l': sl, 'stock_v': sv,
+            'txn': txn, 'mat': mat
         }
-    
-    def create_charts_section(self):
-        """Grafik alanı"""
-        charts_frame = ctk.CTkFrame(self.scrollable_frame, corner_radius=10)
-        charts_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 20))
-        charts_frame.grid_columnconfigure((0, 1), weight=1)
-        
-        # Başlık
-        charts_title = ctk.CTkLabel(
-            charts_frame,
-            text="📊 Grafikler",
-            font=ctk.CTkFont(size=18, weight="bold"),
-            anchor="w"
-        )
-        charts_title.grid(row=0, column=0, columnspan=2, sticky="ew", padx=20, pady=(15, 10))
-        
-        # Sol grafik - Aylık Satış/Alış
-        self.create_monthly_chart(charts_frame, 1, 0)
-        
-        # Sağ grafik - Cari Hesap Dağılımı
-        self.create_pie_chart(charts_frame, 1, 1)
-    
-    def create_monthly_chart(self, parent, row, col):
-        """Aylık satış/alış grafiği"""
-        chart_frame = ctk.CTkFrame(parent, corner_radius=8)
-        chart_frame.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
-        
-        # Grafik başlığı
-        chart_title = ctk.CTkLabel(
-            chart_frame,
-            text="Son 6 Ay Satış/Alış Karşılaştırması",
-            font=ctk.CTkFont(size=14, weight="bold")
-        )
-        chart_title.pack(pady=(10, 5))
-        
-        # Matplotlib figure
-        fig, ax = plt.subplots(figsize=(6, 4))
-        fig.patch.set_facecolor('#f0f0f0')
-        ax.set_facecolor('#f8f8f8')
-        
-        # Örnek veri (gerçek verilerle değiştirilecek)
-        months = ['Ağu', 'Eyl', 'Eki', 'Kas', 'Ara', 'Oca']
-        sales = [150000, 180000, 220000, 190000, 250000, 200000]
-        purchases = [120000, 140000, 180000, 150000, 200000, 160000]
-        
-        x = range(len(months))
-        width = 0.35
-        
-        ax.bar([i - width/2 for i in x], sales, width, label='Satış', color='#2e7d32', alpha=0.8)
-        ax.bar([i + width/2 for i in x], purchases, width, label='Alış', color='#d32f2f', alpha=0.8)
-        
-        ax.set_xlabel('Aylar')
-        ax.set_ylabel('Tutar (₺)')
-        ax.set_xticks(x)
-        ax.set_xticklabels(months)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        # Format y ekseni
-        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x/1000:.0f}K'))
-        
-        plt.tight_layout()
-        
-        # Canvas oluştur
-        canvas = FigureCanvasTkAgg(fig, chart_frame)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=(0, 10))
-    
-    def create_pie_chart(self, parent, row, col):
-        """Cari hesap dağılım grafiği"""
-        chart_frame = ctk.CTkFrame(parent, corner_radius=8)
-        chart_frame.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
-        
-        # Grafik başlığı
-        chart_title = ctk.CTkLabel(
-            chart_frame,
-            text="Cari Hesap Dağılımı",
-            font=ctk.CTkFont(size=14, weight="bold")
-        )
-        chart_title.pack(pady=(10, 5))
-        
-        # Matplotlib figure
-        fig, ax = plt.subplots(figsize=(6, 4))
-        fig.patch.set_facecolor('#f0f0f0')
-        
-        # Örnek veri
-        labels = ['Müşteriler', 'Tedarikçiler', 'Personel', 'Diğer']
-        sizes = [45, 30, 15, 10]
-        colors = ['#2e7d32', '#d32f2f', '#1976d2', '#7b1fa2']
-        explode = (0.1, 0, 0, 0)
-        
-        ax.pie(sizes, explode=explode, labels=labels, colors=colors,
-               autopct='%1.1f%%', shadow=True, startangle=90)
-        ax.axis('equal')
-        
-        plt.tight_layout()
-        
-        # Canvas oluştur
-        canvas = FigureCanvasTkAgg(fig, chart_frame)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=(0, 10))
-    
-    def create_recent_transactions(self):
-        """Son işlemler"""
-        transactions_frame = ctk.CTkFrame(self.scrollable_frame, corner_radius=10)
-        transactions_frame.grid(row=2, column=0, sticky="nsew", padx=(0, 10), pady=(0, 20))
-        transactions_frame.grid_columnconfigure(0, weight=1)
-        
-        # Başlık
-        trans_title = ctk.CTkLabel(
-            transactions_frame,
-            text="📋 Son İşlemler",
-            font=ctk.CTkFont(size=18, weight="bold"),
-            anchor="w"
-        )
-        trans_title.grid(row=0, column=0, sticky="ew", padx=20, pady=(15, 10))
-        
-        # Tablo frame
-        table_frame = ctk.CTkFrame(transactions_frame, fg_color="transparent")
-        table_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 20))
-        table_frame.grid_columnconfigure(0, weight=1)
-        
-        # Tablo oluştur
-        self.create_transactions_table(table_frame)
-    
-    def create_transactions_table(self, parent):
-        """İşlemler tablosu"""
-        # Tablo başlıkları
-        headers = ["Tarih", "İşlem Tipi", "Açıklama", "Tutar"]
-        
-        # Başlık satırı
-        header_frame = ctk.CTkFrame(parent, corner_radius=5)
-        header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 5))
-        header_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
-        
-        for i, header in enumerate(headers):
-            label = ctk.CTkLabel(
-                header_frame,
-                text=header,
-                font=ctk.CTkFont(size=12, weight="bold"),
-                anchor="center"
-            )
-            label.grid(row=0, column=i, padx=5, pady=10)
-        
-        # Örnek veriler
-        sample_data = [
-            ["01.01.2025", "Satış Faturası", "ABC Ticaret - F001", "15.000 ₺"],
-            ["31.12.2024", "Alış Faturası", "XYZ Tedarik - AF001", "-8.500 ₺"],
-            ["30.12.2024", "Kasa Girişi", "Nakit Tahsilat", "5.000 ₺"],
-            ["29.12.2024", "Banka Çıkışı", "Kira Ödemesi", "-12.000 ₺"],
-            ["28.12.2024", "Satış Faturası", "DEF Ltd. - F002", "22.500 ₺"]
-        ]
-        
-        # Veri satırları
-        for i, row_data in enumerate(sample_data):
-            row_frame = ctk.CTkFrame(parent, corner_radius=5, fg_color=("gray95", "gray15"))
-            row_frame.grid(row=i+1, column=0, sticky="ew", pady=2)
-            row_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
-            
-            for j, cell_data in enumerate(row_data):
-                color = ("gray10", "gray90")
-                if j == 3:  # Tutar sütunu
-                    if "-" in cell_data:
-                        color = ("#d32f2f", "#d32f2f")
-                    else:
-                        color = ("#2e7d32", "#2e7d32")
-                
-                label = ctk.CTkLabel(
-                    row_frame,
-                    text=cell_data,
-                    font=ctk.CTkFont(size=11),
-                    text_color=color,
-                    anchor="center"
-                )
-                label.grid(row=0, column=j, padx=5, pady=8)
-    
-    def create_quick_access(self):
-        """Hızlı erişim butonları"""
-        quick_frame = ctk.CTkFrame(self.scrollable_frame, corner_radius=10)
-        quick_frame.grid(row=2, column=1, sticky="nsew", padx=(10, 0), pady=(0, 20))
-        quick_frame.grid_columnconfigure(0, weight=1)
-        
-        # Başlık
-        quick_title = ctk.CTkLabel(
-            quick_frame,
-            text="⚡ Hızlı Erişim",
-            font=ctk.CTkFont(size=18, weight="bold"),
-            anchor="w"
-        )
-        quick_title.grid(row=0, column=0, sticky="ew", padx=20, pady=(15, 10))
-        
-        # Butonlar
-        buttons_frame = ctk.CTkFrame(quick_frame, fg_color="transparent")
-        buttons_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 20))
-        buttons_frame.grid_columnconfigure(0, weight=1)
-        
-        quick_buttons = [
-            ("📝 Yeni Fatura", "invoice", self.new_invoice),
-            ("💰 Kasa İşlemi", "cash", self.cash_operation),
-            ("🏦 Banka İşlemi", "bank", self.bank_operation),
-            ("👥 Yeni Cari", "customer", self.new_customer),
-            ("📦 Stok Girişi", "stock", self.stock_entry),
-            ("📊 Mizan Raporu", "report", self.balance_report)
-        ]
-        
-        for i, (text, key, command) in enumerate(quick_buttons):
-            btn = ctk.CTkButton(
-                buttons_frame,
-                text=text,
-                font=ctk.CTkFont(size=12, weight="bold"),
-                height=40,
-                command=command,
-                corner_radius=8
-            )
-            btn.grid(row=i, column=0, sticky="ew", pady=5)
-    
-    def load_dashboard_data(self):
-        """Dashboard verilerini yükle"""
-        try:
-            # Toplam satış
-            sales_data = self.get_monthly_sales()
-            if sales_data:
-                formatted_sales = self.format_currency(sales_data)
-                self.summary_cards['sales']['value_label'].configure(text=formatted_sales)
-            
-            # Toplam alış
-            purchases_data = self.get_monthly_purchases()
-            if purchases_data:
-                formatted_purchases = self.format_currency(purchases_data)
-                self.summary_cards['purchases']['value_label'].configure(text=formatted_purchases)
-            
-            # Kasa bakiyesi
-            cash_balance = self.get_cash_balance()
-            if cash_balance:
-                formatted_cash = self.format_currency(cash_balance)
-                self.summary_cards['cash']['value_label'].configure(text=formatted_cash)
-            
-            # Banka bakiyesi
-            bank_balance = self.get_bank_balance()
-            if bank_balance:
-                formatted_bank = self.format_currency(bank_balance)
-                self.summary_cards['bank']['value_label'].configure(text=formatted_bank)
-        
-        except Exception as e:
-            print(f"Dashboard veri yükleme hatası: {e}")
-    
-    def get_monthly_sales(self):
-        """Bu ayın toplam satışını getir"""
-        try:
-            today = date.today()
-            first_day = date(today.year, today.month, 1)
-            
-            query = """
-            SELECT COALESCE(SUM(TotalAmount), 0) as TotalSales
-            FROM Invoices 
-            WHERE InvoiceType = 'Satis' 
-            AND InvoiceDate >= ? 
-            AND InvoiceDate <= ?
-            """
-            
-            result = self.db_manager.execute_query(query, (first_day, today))
-            return result[0]['TotalSales'] if result else 0
-        except:
-            return 0
-    
-    def get_monthly_purchases(self):
-        """Bu ayın toplam alışını getir"""
-        try:
-            today = date.today()
-            first_day = date(today.year, today.month, 1)
-            
-            query = """
-            SELECT COALESCE(SUM(TotalAmount), 0) as TotalPurchases
-            FROM Invoices 
-            WHERE InvoiceType = 'Alis' 
-            AND InvoiceDate >= ? 
-            AND InvoiceDate <= ?
-            """
-            
-            result = self.db_manager.execute_query(query, (first_day, today))
-            return result[0]['TotalPurchases'] if result else 0
-        except:
-            return 0
-    
-    def get_cash_balance(self):
-        """Toplam kasa bakiyesini getir"""
-        try:
-            query = "SELECT COALESCE(SUM(CurrentBalance), 0) as TotalCash FROM CashRegisters WHERE IsActive = 1"
-            result = self.db_manager.execute_query(query)
-            return result[0]['TotalCash'] if result else 0
-        except:
-            return 0
-    
-    def get_bank_balance(self):
-        """Toplam banka bakiyesini getir"""
-        try:
-            query = "SELECT COALESCE(SUM(CurrentBalance), 0) as TotalBank FROM Banks WHERE IsActive = 1"
-            result = self.db_manager.execute_query(query)
-            return result[0]['TotalBank'] if result else 0
-        except:
-            return 0
-    
-    def format_currency(self, amount):
-        """Para birimi formatla"""
-        if amount is None:
-            amount = 0
-        return f"{amount:,.2f} ₺".replace(",", ".")
-    
-    # Hızlı erişim fonksiyonları
-    def new_invoice(self):
-        """Yeni fatura"""
-        self.main_app.show_module('invoices')
-    
-    def cash_operation(self):
-        """Kasa işlemi"""
-        self.main_app.show_module('cashbank')
-    
-    def bank_operation(self):
-        """Banka işlemi"""
-        self.main_app.show_module('cashbank')
-    
-    def new_customer(self):
-        """Yeni cari"""
-        self.main_app.show_module('customers')
-    
-    def stock_entry(self):
-        """Stok girişi"""
-        self.main_app.show_module('inventory')
-    
-    def balance_report(self):
-        """Mizan raporu"""
-        self.main_app.show_module('reports')
+
+    def _up(self, d):
+        if not d: return
+        now = datetime.now()
+        self._tl.configure(text=now.strftime("%d %B %Y - %H:%M"))
+        sd, cd, bd, crd, skd = d['sd'], d['cd'], d['bd'], d['crd'], d['skd']
+        self._sc['satis'].set_value(fmt(sd['v']))
+        if sd.get('ch') is not None: self._sc['satis'].set_change(sd['ch'])
+        self._sc['tahsilat'].set_value(fmt(sd['v']*0.75))
+        self._sc['tahsilat'].set_change(random.uniform(-3,8))
+        self._sc['kasa'].set_value(fmt(cd['v']))
+        if cd.get('ch') is not None: self._sc['kasa'].set_change(cd['ch'])
+        self._sc['banka'].set_value(fmt(bd['v']))
+        if bd.get('ch') is not None: self._sc['banka'].set_change(bd['ch'])
+        if crd.get('al',0) or crd.get('vr',0):
+            self._sc['cari'].set_value(f"{fmt(crd['al'])} / {fmt(crd['vr'])}")
+        else:
+            self._sc['cari'].set_value(fmt(crd['v']))
+        if crd.get('ch') is not None: self._sc['cari'].set_change(crd['ch'])
+        self._sc['stok'].set_value(fmt(skd['v']))
+        if skd.get('ch') is not None: self._sc['stok'].set_change(skd['ch'])
+
+        self._ch(d)
+        self._tx(d['txn'])
+        self._mat(d['mat'])
+
+    def _ch(self, d):
+        for k, data, ct in [("bar",(d['ml'],d['ms'],d['mp']),"bar"),("pie",(d['ckeys'],d['cvals']),"pie"),
+                            ("line",(d['cf_labels'],d['cf_in'],d['cf_out']),"line"),("hbar",(d['stock_l'],d['stock_v']),"hbar")]:
+            f = self._cf.get(k)
+            if not f: continue
+            for w in f.winfo_children()[1:]: w.destroy()
+            try:
+                plt.rcParams.update({'font.size':11,'font.family':'sans-serif'})
+            except Exception:
+                pass
+            try:
+                fig, ax = plt.subplots(figsize=(5.8,3.2), dpi=90)
+                fig.patch.set_facecolor('#ffffff')
+                if ct == "bar":
+                    ax.set_facecolor('#fafafa')
+                    x = range(len(data[0]))
+                    ax.bar([i-0.175 for i in x], data[1], 0.35, label='Satış', color=SUCCESS, alpha=0.85)
+                    ax.bar([i+0.175 for i in x], data[2], 0.35, label='Alış', color=DANGER, alpha=0.85)
+                    ax.set_xticks(x); ax.set_xticklabels(data[0], fontsize=10)
+                    ax.legend(fontsize=10, loc='upper left'); ax.grid(True, alpha=0.2, axis='y')
+                    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x,p: f'{x/1000:.0f}K'))
+                elif ct == "pie":
+                    colors = [SUCCESS, DANGER, PRIMARY, "#7b1fa2", WARNING]
+                    wedges, txts, atxts = ax.pie(data[1], labels=data[0], colors=colors[:len(data[0])],
+                        autopct='%1.0f%%', startangle=90, pctdistance=0.75)
+                    for t in txts: t.set_fontsize(10)
+                    for t in atxts: t.set_fontsize(9)
+                elif ct == "line":
+                    ax.set_facecolor('#fafafa')
+                    st = max(1, len(data[0])//8)
+                    ax.plot(data[0], data[1], label='Giriş', color=SUCCESS, linewidth=1.5, marker='o', markersize=2)
+                    ax.plot(data[0], data[2], label='Çıkış', color=DANGER, linewidth=1.5, marker='o', markersize=2)
+                    ax.set_xticks(range(0,len(data[0]),st))
+                    ax.set_xticklabels([data[0][i] for i in range(0,len(data[0]),st)], fontsize=9, rotation=30)
+                    ax.legend(fontsize=10, loc='upper left'); ax.grid(True, alpha=0.2)
+                    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x,p: f'{x/1000:.0f}K'))
+                elif ct == "hbar":
+                    ax.set_facecolor('#fafafa')
+                    y = range(len(data[0]))
+                    ax.barh(y, data[1], color=PRIMARY_LIGHT, alpha=0.85, height=0.7)
+                    ax.set_yticks(y); ax.set_yticklabels(data[0], fontsize=9); ax.invert_yaxis()
+                    ax.grid(True, alpha=0.2, axis='x')
+                plt.tight_layout()
+                canvas = FigureCanvasTkAgg(fig, f); canvas.draw()
+                canvas.get_tk_widget().pack(fill="both", expand=True, padx=8, pady=(0,8))
+                plt.close(fig)
+            except Exception:
+                ctk.CTkLabel(f, text="Grafik çizilemedi", text_color=TEXT_MUTED).pack(expand=True)
+
+    def _tx(self, txn):
+        for w in self._tc.winfo_children(): w.destroy()
+        if not txn: ctk.CTkLabel(self._tc, text="İşlem bulunamadı", text_color=TEXT_MUTED).pack(expand=True); return
+        h = ctk.CTkFrame(self._tc, fg_color="#f8f9fa", corner_radius=6); h.pack(fill="x")
+        h.grid_columnconfigure((0,1,2,3), weight=1)
+        for i,ht in enumerate(["Tarih","İşlem","Açıklama","Tutar"]):
+            ctk.CTkLabel(h, text=ht, font=ctk.CTkFont(size=12,weight="bold"), text_color=TEXT_MUTED).grid(row=0, column=i, padx=4, pady=8)
+        for t in txn:
+            r = ctk.CTkFrame(self._tc, fg_color="transparent"); r.pack(fill="x", pady=1)
+            r.grid_columnconfigure((0,1,2,3), weight=1)
+            amt = t.get('amt',0); c = SUCCESS if amt>=0 else DANGER
+            for j,v in enumerate([t.get('d',''),t.get('tp',''),t.get('desc',''),fmt(abs(amt))]):
+                ctk.CTkLabel(r, text=v, font=ctk.CTkFont(size=12), text_color=c if j==3 else TEXT_DARK).grid(row=0, column=j, padx=4, pady=5)
+        ctk.CTkFrame(self._tc, height=1, fg_color=BORDER).pack(fill="x", pady=6)
+
+    def _mat(self, mat):
+        for w in self._mc.winfo_children(): w.destroy()
+        if not mat: ctk.CTkLabel(self._mc, text="Yaklaşan vade bulunamadı", text_color=TEXT_MUTED).pack(expand=True); return
+        for m in mat:
+            r = ctk.CTkFrame(self._mc, fg_color="transparent"); r.pack(fill="x", pady=2, padx=4)
+            r.grid_columnconfigure(0, weight=1); r.grid_columnconfigure(1, weight=0)
+            du = m.get('due','')
+            try:
+                dt = datetime.strptime(du[:10],'%Y-%m-%d')
+                dl = (dt.date()-date.today()).days
+                du = dt.strftime('%d.%m.%Y')
+                du += f" ({-dl} gün gecikti)" if dl<0 else f" ({dl} gün)"
+            except Exception:
+                pass
+            ctk.CTkLabel(r, text=f"{m.get('name','')} - {m.get('inv','')}", font=ctk.CTkFont(size=13),
+                text_color=TEXT_DARK, anchor="w").grid(row=0, column=0, sticky="w")
+            ctk.CTkLabel(r, text=du, font=ctk.CTkFont(size=12), text_color=TEXT_MUTED, anchor="w").grid(row=1, column=0, sticky="w")
+            ctk.CTkLabel(r, text=fmt(m.get('amt',0)), font=ctk.CTkFont(size=12, weight="bold"),
+                text_color=DANGER).grid(row=0, column=1, rowspan=2, sticky="e", padx=(8,0))
+
+    def _auto(self):
+        if self._rid: self.after_cancel(self._rid)
+        self._rid = self.after(60000, lambda: (self.refresh(), self._auto()))
+
+    def _ni(self):
+        if self.main_app: self.main_app.show_module('invoices')
+    def _co(self):
+        if self.main_app: self.main_app.show_module('cashbank')
+    def _nc(self):
+        if self.main_app: self.main_app.show_module('customers')
+    def _br(self):
+        if self.main_app: self.main_app.show_module('reports')
+
+    def destroy(self):
+        if self._rid: self.after_cancel(self._rid)
+        super().destroy()

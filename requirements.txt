@@ -1,31 +1,41 @@
-# Accura Finance - Muhasebe Programı
+# Accura Finance - Gelişmiş Muhasebe Programı
 # Gerekli Python Paketleri
 
 # GUI Framework
-customtkinter==5.2.2
-
-# Database
-pyodbc==5.0.1
-sqlalchemy==2.0.23
+customtkinter>=6.0.0
 
 # Data Processing
-pandas==2.1.4
-numpy==1.25.2
+pandas>=2.1.0
+numpy>=1.25.0
 
 # Reporting
-matplotlib==3.8.2
-
-# Date/Time
-python-dateutil==2.8.2
+matplotlib>=3.8.0
+openpyxl>=3.1.0
+reportlab>=5.0.0
 
 # Configuration
 configparser
 
 # Logging
-colorlog==6.8.0
+colorlog>=6.8.0
 
 # Image Processing
-Pillow==10.1.0
+Pillow>=10.1.0
 
 # System
-psutil==5.9.6
+psutil>=5.9.0
+
+# PDF Generation
+fpdf2>=2.7.0
+
+# ORM (opsiyonel - models.py icin)
+sqlalchemy>=2.0.0
+
+# Excel Export
+xlsxwriter>=3.1.0
+
+# Date/Time
+python-dateutil>=2.8.0
+
+# Encryption (opsiyonel)
+# cryptography>=41.0.0

@@ -104,8 +104,27 @@ node_modules/
 ~$*.xlsx
 ~$*.xls
 
+# Data & Backups
+backups/
+data/
+
+# Virtual environment
+venv/
+.virtualenvs/
+
 # Application specific
 src/database/connection_test.py
 test_*.py
 debug_*.py
 temp_*.py
+*_old.py
+old_*.py
+
+# IDE & AI
+.opencode/
+.idea/
+.vscode/
+
+# POS integration logs
+posentegre/posentegre_logs/
+yazarkasa/logs/
