@@ -9,6 +9,7 @@ from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.sql import func
 from datetime import datetime, date
 import hashlib
+import secrets
 
 Base = declarative_base()
 
@@ -47,12 +48,21 @@ class User(Base):
     creator = relationship("User", remote_side=[UserID])
     
     def set_password(self, password):
-        """Şifreyi hash'le ve kaydet"""
-        self.PasswordHash = hashlib.sha256(password.encode()).hexdigest()
+        """Şifreyi hash'le ve kaydet (PBKDF2-SHA256)"""
+        salt = secrets.token_hex(16)
+        pw_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
+        self.PasswordHash = f"{salt}${pw_hash}"
     
     def check_password(self, password):
         """Şifreyi kontrol et"""
-        return self.PasswordHash == hashlib.sha256(password.encode()).hexdigest()
+        stored = self.PasswordHash
+        if "$" in stored:
+            salt, expected = stored.split("$", 1)
+            computed = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
+            return computed == expected
+        else:
+            # Eski SHA256 formatı için geriye uyumluluk
+            return self.PasswordHash == hashlib.sha256(password.encode()).hexdigest()
 
 class ChartOfAccount(Base):
     __tablename__ = 'ChartOfAccounts'
