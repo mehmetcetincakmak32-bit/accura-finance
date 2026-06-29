@@ -125,11 +125,10 @@ class AccountingFrame(ctk.CTkFrame):
 
     def _parse_date_to_iso(self, date_str):
         try:
-            parts = date_str.split(".")
-            if len(parts) == 3:
-                return f"{parts[2]}-{parts[1]}-{parts[0]}"
-        except Exception:
-            pass
+            dt = datetime.strptime(date_str, "%d.%m.%Y")
+            return dt.strftime("%Y-%m-%d")
+        except ValueError:
+            return date_str
         return date_str
 
     def load_accounts_from_db(self):
