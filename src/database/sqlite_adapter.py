@@ -194,6 +194,349 @@ class SQLiteManager:
             Description TEXT,
             UpdatedDate TEXT DEFAULT (datetime('now','localtime'))
         );
+
+        CREATE TABLE IF NOT EXISTS ChartOfAccounts (
+            AccountID INTEGER PRIMARY KEY AUTOINCREMENT,
+            AccountCode TEXT UNIQUE NOT NULL,
+            AccountName TEXT NOT NULL,
+            ParentAccountID INTEGER,
+            AccountType TEXT NOT NULL,
+            AccountGroup TEXT,
+            IsDetailAccount INTEGER DEFAULT 0,
+            IsActive INTEGER DEFAULT 1,
+            FOREIGN KEY (ParentAccountID) REFERENCES ChartOfAccounts(AccountID)
+        );
+
+        CREATE TABLE IF NOT EXISTS StockCategories (
+            CategoryID INTEGER PRIMARY KEY AUTOINCREMENT,
+            CategoryCode TEXT UNIQUE NOT NULL,
+            CategoryName TEXT NOT NULL,
+            ParentCategoryID INTEGER,
+            Description TEXT,
+            IsActive INTEGER DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS StockItems (
+            StockID INTEGER PRIMARY KEY AUTOINCREMENT,
+            StockCode TEXT UNIQUE NOT NULL,
+            StockName TEXT NOT NULL,
+            CategoryID INTEGER,
+            Unit TEXT DEFAULT 'Adet',
+            Barcode TEXT,
+            PurchasePrice REAL DEFAULT 0,
+            SalePrice REAL DEFAULT 0,
+            VATRate REAL DEFAULT 18,
+            MinStockLevel REAL DEFAULT 0,
+            MaxStockLevel REAL DEFAULT 0,
+            CurrentStock REAL DEFAULT 0,
+            IsActive INTEGER DEFAULT 1,
+            CreatedDate TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (CategoryID) REFERENCES StockCategories(CategoryID)
+        );
+
+        CREATE TABLE IF NOT EXISTS StockMovements (
+            MovementID INTEGER PRIMARY KEY AUTOINCREMENT,
+            StockID INTEGER NOT NULL,
+            MovementDate TEXT NOT NULL,
+            MovementType TEXT NOT NULL,
+            Quantity REAL NOT NULL,
+            UnitPrice REAL DEFAULT 0,
+            TotalAmount REAL DEFAULT 0,
+            DocumentNumber TEXT,
+            Description TEXT,
+            CreatedDate TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (StockID) REFERENCES StockItems(StockID)
+        );
+
+        CREATE TABLE IF NOT EXISTS Banks (
+            BankID INTEGER PRIMARY KEY AUTOINCREMENT,
+            BankCode TEXT UNIQUE NOT NULL,
+            BankName TEXT NOT NULL,
+            AccountNumber TEXT,
+            IBAN TEXT,
+            BranchName TEXT,
+            BranchCode TEXT,
+            CurrencyCode TEXT DEFAULT 'TRY',
+            OpeningBalance REAL DEFAULT 0,
+            CurrentBalance REAL DEFAULT 0,
+            ResponsiblePerson TEXT,
+            IsActive INTEGER DEFAULT 1,
+            CreatedDate TEXT DEFAULT (datetime('now','localtime')),
+            UpdatedDate TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS JournalEntries (
+            JournalEntryID INTEGER PRIMARY KEY AUTOINCREMENT,
+            VoucherNumber TEXT UNIQUE NOT NULL,
+            VoucherDate TEXT NOT NULL,
+            Description TEXT,
+            TotalDebit REAL DEFAULT 0,
+            TotalCredit REAL DEFAULT 0,
+            IsBalanced INTEGER DEFAULT 0,
+            IsPosted INTEGER DEFAULT 0,
+            PostedDate TEXT,
+            DocumentType TEXT,
+            DocumentNumber TEXT,
+            CreatedDate TEXT DEFAULT (datetime('now','localtime')),
+            CreatedBy INTEGER
+        );
+
+        CREATE TABLE IF NOT EXISTS JournalEntryDetails (
+            JournalDetailID INTEGER PRIMARY KEY AUTOINCREMENT,
+            JournalEntryID INTEGER NOT NULL,
+            LineNumber INTEGER NOT NULL,
+            AccountID INTEGER NOT NULL,
+            CurrentAccountID INTEGER,
+            Description TEXT,
+            DebitAmount REAL DEFAULT 0,
+            CreditAmount REAL DEFAULT 0,
+            FOREIGN KEY (JournalEntryID) REFERENCES JournalEntries(JournalEntryID) ON DELETE CASCADE,
+            FOREIGN KEY (AccountID) REFERENCES ChartOfAccounts(AccountID)
+        );
+
+        CREATE TABLE IF NOT EXISTS Branches (
+            BranchID INTEGER PRIMARY KEY AUTOINCREMENT,
+            BranchCode TEXT UNIQUE NOT NULL,
+            BranchName TEXT NOT NULL,
+            Address TEXT,
+            City TEXT,
+            District TEXT,
+            Phone TEXT,
+            ManagerName TEXT,
+            IsHeadOffice INTEGER DEFAULT 0,
+            IsActive INTEGER DEFAULT 1,
+            CreatedDate TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS BranchTransfers (
+            TransferID INTEGER PRIMARY KEY AUTOINCREMENT,
+            TransferCode TEXT UNIQUE NOT NULL,
+            TransferDate TEXT NOT NULL,
+            SourceBranchID INTEGER,
+            TargetBranchID INTEGER,
+            Status TEXT DEFAULT 'Hazirlaniyor',
+            Notes TEXT,
+            FOREIGN KEY (SourceBranchID) REFERENCES Branches(BranchID),
+            FOREIGN KEY (TargetBranchID) REFERENCES Branches(BranchID),
+            CreatedDate TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS Checks (
+            CheckID INTEGER PRIMARY KEY AUTOINCREMENT,
+            CheckNo TEXT NOT NULL,
+            BankName TEXT NOT NULL,
+            BankBranch TEXT,
+            AccountNo TEXT,
+            Amount REAL NOT NULL,
+            CheckDate TEXT NOT NULL,
+            MaturityDate TEXT NOT NULL,
+            CurrentAccountID INTEGER,
+            CheckType TEXT NOT NULL,
+            CheckStatus TEXT DEFAULT 'Portfoyde',
+            ReceivedDate TEXT,
+            DeliveredDate TEXT,
+            EndorsedTo TEXT,
+            Description TEXT,
+            FOREIGN KEY (CurrentAccountID) REFERENCES CurrentAccounts(CurrentAccountID),
+            CreatedDate TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS CheckEndorsements (
+            EndorsementID INTEGER PRIMARY KEY AUTOINCREMENT,
+            CheckID INTEGER,
+            EndorsementDate TEXT NOT NULL,
+            EndorsedTo TEXT NOT NULL,
+            EndorsementType TEXT,
+            Amount REAL,
+            Description TEXT,
+            FOREIGN KEY (CheckID) REFERENCES Checks(CheckID) ON DELETE CASCADE,
+            CreatedDate TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS BouncedChecks (
+            BouncedID INTEGER PRIMARY KEY AUTOINCREMENT,
+            CheckID INTEGER,
+            ProtestDate TEXT NOT NULL,
+            Reason TEXT,
+            ProtestCost REAL DEFAULT 0,
+            LegalProcessStarted INTEGER DEFAULT 0,
+            LegalProcessNote TEXT,
+            RecoveryAmount REAL DEFAULT 0,
+            RecoveryDate TEXT,
+            FOREIGN KEY (CheckID) REFERENCES Checks(CheckID),
+            CreatedDate TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS CheckPortfolios (
+            PortfolioID INTEGER PRIMARY KEY AUTOINCREMENT,
+            PortfolioCode TEXT UNIQUE NOT NULL,
+            PortfolioDate TEXT NOT NULL,
+            PortfolioType TEXT,
+            TotalCount INTEGER DEFAULT 0,
+            TotalAmount REAL DEFAULT 0,
+            Description TEXT,
+            CreatedDate TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS POS_Sessions (
+            SessionID INTEGER PRIMARY KEY AUTOINCREMENT,
+            POSRegisterID INTEGER,
+            UserID INTEGER,
+            OpeningDate TEXT NOT NULL,
+            ClosingDate TEXT,
+            OpeningAmount REAL DEFAULT 0,
+            ClosingAmount REAL DEFAULT 0,
+            CashSales REAL DEFAULT 0,
+            CreditSales REAL DEFAULT 0,
+            TotalSales REAL DEFAULT 0,
+            ReturnCount INTEGER DEFAULT 0,
+            ReturnAmount REAL DEFAULT 0,
+            DiscountAmount REAL DEFAULT 0,
+            IsActive INTEGER DEFAULT 1,
+            Status TEXT DEFAULT 'Acik',
+            FOREIGN KEY (POSRegisterID) REFERENCES POSRegisters(POSRegisterID),
+            FOREIGN KEY (UserID) REFERENCES Users(UserID)
+        );
+
+        CREATE TABLE IF NOT EXISTS POSReceipts (
+            ReceiptID INTEGER PRIMARY KEY AUTOINCREMENT,
+            ReceiptNumber TEXT UNIQUE NOT NULL,
+            SessionID INTEGER,
+            POSRegisterID INTEGER,
+            BranchID INTEGER,
+            UserID INTEGER,
+            CurrentAccountID INTEGER,
+            ReceiptDate TEXT NOT NULL,
+            ReceiptType TEXT DEFAULT 'Satis',
+            PaymentType TEXT DEFAULT 'Nakit',
+            SubTotal REAL DEFAULT 0,
+            DiscountAmount REAL DEFAULT 0,
+            VATAmount REAL DEFAULT 0,
+            TotalAmount REAL DEFAULT 0,
+            PaidAmount REAL DEFAULT 0,
+            ChangeAmount REAL DEFAULT 0,
+            IsCancelled INTEGER DEFAULT 0,
+            FOREIGN KEY (SessionID) REFERENCES POS_Sessions(SessionID),
+            FOREIGN KEY (BranchID) REFERENCES Branches(BranchID),
+            FOREIGN KEY (CurrentAccountID) REFERENCES CurrentAccounts(CurrentAccountID),
+            CreatedDate TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS POSReceiptDetails (
+            ReceiptDetailID INTEGER PRIMARY KEY AUTOINCREMENT,
+            ReceiptID INTEGER NOT NULL,
+            LineNumber INTEGER NOT NULL,
+            StockID INTEGER,
+            StockName TEXT NOT NULL,
+            Barcode TEXT,
+            Quantity REAL NOT NULL,
+            UnitPrice REAL NOT NULL,
+            DiscountRate REAL DEFAULT 0,
+            DiscountAmount REAL DEFAULT 0,
+            NetPrice REAL NOT NULL,
+            VATRate REAL DEFAULT 18,
+            VATAmount REAL DEFAULT 0,
+            TotalAmount REAL NOT NULL,
+            FOREIGN KEY (ReceiptID) REFERENCES POSReceipts(ReceiptID) ON DELETE CASCADE,
+            FOREIGN KEY (StockID) REFERENCES StockItems(StockID)
+        );
+
+        CREATE TABLE IF NOT EXISTS ProductionRecipes (
+            RecipeID INTEGER PRIMARY KEY AUTOINCREMENT,
+            RecipeCode TEXT UNIQUE NOT NULL,
+            RecipeName TEXT NOT NULL,
+            ProductID INTEGER,
+            Quantity REAL DEFAULT 1,
+            Unit TEXT,
+            TotalCost REAL DEFAULT 0,
+            LaborCost REAL DEFAULT 0,
+            OverheadCost REAL DEFAULT 0,
+            Notes TEXT,
+            IsActive INTEGER DEFAULT 1,
+            FOREIGN KEY (ProductID) REFERENCES StockItems(StockID),
+            CreatedDate TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS ProductionRecipeDetails (
+            RecipeDetailID INTEGER PRIMARY KEY AUTOINCREMENT,
+            RecipeID INTEGER NOT NULL,
+            LineNumber INTEGER NOT NULL,
+            RawMaterialID INTEGER,
+            Quantity REAL NOT NULL,
+            Unit TEXT,
+            UnitCost REAL DEFAULT 0,
+            TotalCost REAL DEFAULT 0,
+            WasteRate REAL DEFAULT 0,
+            FOREIGN KEY (RecipeID) REFERENCES ProductionRecipes(RecipeID) ON DELETE CASCADE,
+            FOREIGN KEY (RawMaterialID) REFERENCES StockItems(StockID)
+        );
+
+        CREATE TABLE IF NOT EXISTS ProductionOrders (
+            OrderID INTEGER PRIMARY KEY AUTOINCREMENT,
+            OrderCode TEXT UNIQUE NOT NULL,
+            OrderDate TEXT NOT NULL,
+            RecipeID INTEGER,
+            ProductID INTEGER,
+            PlannedQuantity REAL NOT NULL,
+            ProducedQuantity REAL DEFAULT 0,
+            DefectQuantity REAL DEFAULT 0,
+            UnitCost REAL DEFAULT 0,
+            TotalCost REAL DEFAULT 0,
+            Status TEXT DEFAULT 'Planlandi',
+            StartDate TEXT,
+            EndDate TEXT,
+            Notes TEXT,
+            FOREIGN KEY (RecipeID) REFERENCES ProductionRecipes(RecipeID),
+            FOREIGN KEY (ProductID) REFERENCES StockItems(StockID),
+            CreatedDate TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS CRM_Activities (
+            ActivityID INTEGER PRIMARY KEY AUTOINCREMENT,
+            ActivityDate TEXT NOT NULL,
+            ActivityType TEXT,
+            CurrentAccountID INTEGER,
+            ContactPerson TEXT,
+            Subject TEXT,
+            Description TEXT,
+            Status TEXT DEFAULT 'Planlandi',
+            FollowUpDate TEXT,
+            IsCompleted INTEGER DEFAULT 0,
+            CompletedDate TEXT,
+            FOREIGN KEY (CurrentAccountID) REFERENCES CurrentAccounts(CurrentAccountID),
+            CreatedDate TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS BarcodeTemplates (
+            TemplateID INTEGER PRIMARY KEY AUTOINCREMENT,
+            TemplateName TEXT NOT NULL,
+            LabelWidth REAL NOT NULL,
+            LabelHeight REAL NOT NULL,
+            FieldsConfiguration TEXT,
+            PrinterName TEXT,
+            IsDefault INTEGER DEFAULT 0,
+            CreatedDate TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS SearchHistory (
+            SearchID INTEGER PRIMARY KEY AUTOINCREMENT,
+            UserID INTEGER,
+            SearchTerm TEXT NOT NULL,
+            Module TEXT,
+            SearchedAt TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (UserID) REFERENCES Users(UserID)
+        );
+
+        CREATE TABLE IF NOT EXISTS AuditLog (
+            AuditID INTEGER PRIMARY KEY AUTOINCREMENT,
+            TableName TEXT NOT NULL,
+            RecordID INTEGER,
+            Action TEXT NOT NULL,
+            UserID INTEGER,
+            ActionDate TEXT DEFAULT (datetime('now','localtime')),
+            NewValues TEXT,
+            FOREIGN KEY (UserID) REFERENCES Users(UserID)
+        );
         """
 
         try:

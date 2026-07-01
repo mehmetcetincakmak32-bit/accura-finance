@@ -65,23 +65,23 @@ class POSConfig:
             'halkbank': '1.5'
         }
 
-        # Banka kimlik bilgileri
+        # Banka kimlik bilgileri (ortam değişkenlerinden ayarlanmalı)
         self._config['MERCHANT_IDS'] = {
-            'akbank': 'AKB12345',
-            'garanti': 'GAR12345',
-            'ykb': 'YKB12345',
-            'isbank': 'ISB12345',
-            'ziraat': 'ZRT12345',
-            'halkbank': 'HLK12345'
+            'akbank': '',
+            'garanti': '',
+            'ykb': '',
+            'isbank': '',
+            'ziraat': '',
+            'halkbank': ''
         }
 
         self._config['TERMINAL_IDS'] = {
-            'akbank': 'TML001',
-            'garanti': 'TML002',
-            'ykb': 'TML003',
-            'isbank': 'TML004',
-            'ziraat': 'TML005',
-            'halkbank': 'TML006'
+            'akbank': '',
+            'garanti': '',
+            'ykb': '',
+            'isbank': '',
+            'ziraat': '',
+            'halkbank': ''
         }
 
         # REST API ayarlari

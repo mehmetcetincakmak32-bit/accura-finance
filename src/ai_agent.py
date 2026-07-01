@@ -42,7 +42,7 @@ class AIAgent:
             }
 
             req = urllib.request.Request(
-                f"{self.api_url}?key={self.api_key}",
+                self.api_url,
                 data=json.dumps(data).encode(),
                 headers={
                     "Content-Type": "application/json",

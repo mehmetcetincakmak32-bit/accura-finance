@@ -143,7 +143,7 @@ class AuditLogger:
             try:
                 self.db_manager.execute_query(
                     """INSERT INTO AuditLog (TableName, RecordID, Action, UserID, ActionDate, NewValues)
-                       VALUES (?, ?, ?, ?, GETDATE(), ?)""",
+                       VALUES (?, ?, ?, ?, datetime('now','localtime'), ?)""",
                     (table_name, record_id, action, user_id, details),
                     fetch=False
                 )

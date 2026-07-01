@@ -7,7 +7,7 @@ import os
 # Veritabanı oluşturma bağlantı stringi (master veritabanına bağlan)
 connection_string = (
     "DRIVER={ODBC Driver 17 for SQL Server};"
-    "SERVER=PINARIISKO;"
+    "SERVER=.;"
     "DATABASE=master;"
     "Trusted_Connection=yes;"
     "TrustServerCertificate=yes"
@@ -40,8 +40,8 @@ try:
     
     new_connection_string = (
         "DRIVER={ODBC Driver 17 for SQL Server};"
-        "SERVER=PINARIISKO;"
-        "DATABASE=AccuraFinanceDB;"
+    "SERVER=.;"
+    "DATABASE=AccuraFinanceDB;"
         "Trusted_Connection=yes;"
         "TrustServerCertificate=yes"
     )

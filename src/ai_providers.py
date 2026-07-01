@@ -193,9 +193,12 @@ class AIProvider:
             },
         }
         req = urllib.request.Request(
-            f"{url}?key={self.gemini_api_key}",
+            url,
             data=json.dumps(data).encode(),
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": self.gemini_api_key,
+            },
         )
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:
@@ -220,9 +223,12 @@ class AIProvider:
             "generationConfig": {"temperature": 0.1, "maxOutputTokens": 4096},
         }
         req = urllib.request.Request(
-            f"{url}&key={self.gemini_api_key}",
+            url,
             data=json.dumps(data).encode(),
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": self.gemini_api_key,
+            },
         )
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:

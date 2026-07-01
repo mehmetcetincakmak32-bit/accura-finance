@@ -39,3 +39,12 @@ python-dateutil>=2.8.0
 
 # Encryption (opsiyonel)
 # cryptography>=41.0.0
+
+# Database
+pyodbc>=5.0.0
+
+# Serial Port (yazarkasa)
+pyserial>=3.5
+
+# HTTP Requests
+requests>=2.31.0

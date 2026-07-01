@@ -33,7 +33,7 @@ class DatabaseManagerProxy:
         # Önce SQL Server dene (doğrudan pyodbc ile)
         try:
             import pyodbc
-            conn_str = 'DRIVER={SQL Server};SERVER=localhost;DATABASE=AccuraFinance;Trusted_Connection=yes;'
+            conn_str = 'DRIVER={SQL Server};SERVER=.;DATABASE=AccuraFinance;Trusted_Connection=yes;'
             conn = pyodbc.connect(conn_str, timeout=3)
             conn.close()
             from src.database.sqlite_adapter import get_database_manager as get_sqlite

@@ -241,7 +241,7 @@ class GitHubIntegration:
             invoice_query = """
             INSERT INTO Invoices (InvoiceNumber, InvoiceType, InvoiceDate, CurrentAccountID,
                 SubTotal, VATAmount, TotalAmount, Notes, CreatedDate)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, GETDATE())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'))
             """
             self.db_manager.execute_query(invoice_query, (
                 invoice_no,
